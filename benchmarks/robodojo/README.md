@@ -140,6 +140,7 @@ number of Policy replicas. The sections below follow the order of this table.
 | PyRUA-Lean, scripted agent | K=G=5, shared SAM3, `cover_blocks` | two native single-Worker runs | 4.18× | 24 of 24 verdicts match | [one table per Worker](#2026-11-10-pyrua-lean-with-one-table-per-worker) |
 | PyRUA-Lean, GPT-6.1 Terra | K=G=4, shared SAM3, `cover_blocks` | no paired run | estimated 3.39× | 48 of 48 successes | [one table per Worker](#2026-11-10-pyrua-lean-with-one-table-per-worker) |
 | PyRUA-Lean, GPT-6.1 Terra | 2 processes × 24 tiled tables, `cover_blocks` | four single-table Workers | 2.05×, partial run | camera images differ from native | [one table per Worker](#2026-11-10-pyrua-lean-with-one-table-per-worker) |
+| PyRUA-Lean, scripted agent | K=G=7, start slots, compact GPU memory, all 54 tasks | K=G=1, unmodified runtime | 4.81× on `arx_x5`, 3.46× on `arx_x5_randomized` | 162 of 162 verdicts match; images differ no more than between two serial runs | [seven Workers on every task](#2026-11-12-pyrua-lean-with-seven-workers-on-every-task) |
 | Latency Policy (synthetic) | K=G=5 | K=G=1 | 4.69× | not applicable: the Policy holds still | [latency-bound Policy](#2026-11-07-latency-bound-policy-synthetic) |
 
 ### 2026-11-07: `Simate_beta` with one environment per Worker
@@ -322,6 +323,63 @@ mean.
   4.6 times as long, and the run used 1,653 model requests, about 34 per episode against 15.
 - **Limits:** every run here is one task. The tiled figure is a partial-run rate, not a bound on full
   48-episode throughput: the 13 cut-short episodes may have needed longer.
+
+### 2026-11-12: PyRUA-Lean with seven Workers on every task
+
+On the same RTX 4090 (49,140 MiB), seven Workers evaluated every task of both suites, one table each, with the
+manifest defaults `deferred_batch_planner` and `compact_physx_buffers` on, `simulator_start_free_gpu_mib` 8000,
+the default two start slots and one shared SAM3 service. The runtime was built by `build-runtime.sh` from this
+branch at `COMMIT`. The serial runs used Kit `e4e5682` with its unmodified runtime and one Worker, in which one
+simulator plays a task's layouts in order.
+
+A scripted agent ran the same tool program on every task without model calls: read the state, locate three
+generic prompts with SAM3, move each arm through fixed poses low over the table, close and open one gripper,
+return home and locate again. The workload is layouts 0–2 of the 42 `arx_x5` tasks and the 12
+`arx_x5_randomized` tasks, 162 episodes.
+
+| Run | K=G | Suite | Evaluation | Episodes/h | Gain | Peak GPU |
+|---|---:|---|---:|---:|---:|---:|
+| serial 1 | 1 | `arx_x5` | 9,624.8 s | 47.1 | — | 16,840 MiB |
+| serial 2 | 1 | `arx_x5` | 9,456.0 s | 48.0 | — | 16,811 MiB |
+| 7 Workers | 7 | `arx_x5` | 1,966.3 s | 230.7 | 4.81× | 43,749 MiB |
+| serial 1 | 1 | `arx_x5_randomized` | 4,446.7 s | 29.1 | — | 17,036 MiB |
+| serial 2 | 1 | `arx_x5_randomized` | 3,412.8 s | 38.0 | — | 16,912 MiB |
+| 7 Workers | 7 | `arx_x5_randomized` | 985.7 s | 131.5 | 3.46× | 41,201 MiB |
+
+Gains are against serial 2: serial 1 also filled Omniverse's texture cache for most tasks.
+
+The image difference below is the mean absolute difference of two frames after averaging each over 16×16 pixel
+blocks, on a 0–255 scale, for the head camera. A motion end point differs when two runs report positions more
+than 0.05 mm apart for the same motion call.
+
+| Comparison, 162 episodes | Same verdict | Same tool sequence | Same steps | First frame, mean / max | Last frame, mean | Different motion end point |
+|---|---:|---:|---:|---:|---:|---:|
+| serial 1 and serial 2 | 162 | 162 | 155 | 0.174 / 1.32 | 0.218 | 8 |
+| 7 Workers and serial 1 | 162 | 162 | 155 | 0.157 / 0.59 | 0.213 | 9 |
+| 7 Workers and serial 2 | 162 | 162 | 152 | 0.167 / 1.52 | 0.234 | 10 |
+
+- **Result:** seven Workers agree with a serial run as closely as two serial runs agree with each other, in
+  verdicts, tool sequences, step counts and camera images, on every task.
+- **Tasks that vary between repeats:** every episode with a different step count or motion end point is one of
+  `pour_by_language`, `pour_liquid_into_cup`, `pour_liquid_into_cup_random` and `make_toast_random`, in all three
+  comparisons; the other 50 tasks are identical in both. Layout 0 of `make_toast_random` took 160 steps in both
+  serial runs and 163 with seven Workers. In seven further single-Worker runs it took 163 steps in both runs of
+  the unmodified runtime, and 160 or 163 with the switches on (160 with the PhysX switch alone and in one of two
+  runs with both), with identical motion end points within each group.
+- **GPU memory:** a simulator peaked at 4,946–7,151 MiB on `arx_x5` (median 5,313) and 5,163–7,372 MiB on
+  `arx_x5_randomized` (median 6,264), against 8,057–10,523 MiB (median 8,565) and 8,326–10,991 MiB (median
+  9,414) unmodified. The SAM3 service held 6,264 MiB from its first request, which the Policy wrapper makes
+  before the simulators start.
+- **PhysX buffers:** the largest need of any step, as a share of the compact capacity, was 12% of the collision
+  stack, 3% of the particle contacts and of the found and lost aggregate pairs, and under 2% of every other
+  buffer. With capacities set to 16 instead, the simulator stopped at its first step, reporting the need PhysX
+  itself reports.
+- **Starts:** with episodes of about 75 s, simulators start often: 20 of the 54 simulators waited for free GPU
+  memory, and 4.97 (`arx_x5`) and 3.76 (`arx_x5_randomized`) simulators ran at once on average. An agent that
+  waits for a model keeps a simulator for much longer.
+- **Limits:** a scripted agent without waiting time measures agreement, not an agent's throughput. On this card
+  the seven heaviest `arx_x5` simulators together with SAM3 would need more memory than it has, which is what
+  the free-memory requirement guards against.
 
 ### 2026-11-07: latency-bound Policy (synthetic)
 
