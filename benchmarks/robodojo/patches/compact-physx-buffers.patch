@@ -16,6 +16,14 @@
          render_config = _resolve_sim_section(DEFAULT_RENDER_CONFIG, self.config.get("render"))
          frequency_settings = _resolve_sim_section(
              DEFAULT_FREQUENCY_SETTINGS,
+@@ -206,6 +208,7 @@
+         self.physics_context = sim.sim.get_physics_context()
+ 
+     def close(self):
++        roboscope_physx_buffers.report()
+         try:
+             import omni.timeline
+ 
 --- a/env/environment/isaac/direct_rl_env.py
 +++ b/env/environment/isaac/direct_rl_env.py
 @@ -1,5 +1,7 @@
@@ -36,10 +44,9 @@
                  and self._sim_step_counter % self.cfg.sim.render_interval == 0
 --- /dev/null
 +++ b/roboscope_physx_buffers.py
-@@ -0,0 +1,70 @@
+@@ -0,0 +1,71 @@
 +"""Opt-in compact PhysX GPU buffers for one table per simulator, checked after every physics step."""
 +
-+import atexit
 +import os
 +
 +_ENABLED = os.environ.get("ROBODOJO_COMPACT_PHYSX_BUFFERS") == "1"
@@ -73,7 +80,10 @@
 +    print("[roboscope_physx_buffers] compact PhysX GPU buffers enabled", flush=True)
 +
 +
-+def _report():
++def report():
++    """Print what the steps so far needed of each compact buffer; RoboDojo calls this when it closes."""
++    if not _ENABLED or _handles is None:
++        return
 +    print(
 +        "[roboscope_physx_buffers] peak need of each compact buffer (needed, capacity): "
 +        + ", ".join(f"{name} ({_peak.get(name, 0)}, {capacity})" for name, (capacity, _statistic) in _BUFFERS.items()),
@@ -94,7 +104,6 @@
 +
 +        _handles = (get_physx_statistics_interface(), omni.usd.get_context(),
 +                    PhysicsSchemaTools.sdfPathToInt(_PHYSICS_SCENE), PhysicsSceneStats())
-+        atexit.register(_report)
 +    interface, context, scene, statistics = _handles
 +    if not interface.get_physx_scene_statistics(context.get_stage_id(), scene, statistics):
 +        raise RuntimeError("compact PhysX buffers need the PhysX scene statistics, which are unavailable")

@@ -43,7 +43,7 @@ Two opt-in manifest defaults lower a simulator's GPU memory without changing wha
 - `compact_physx_buffers` sizes PhysX's GPU buffers for one table instead of Isaac Lab's defaults for thousands
   of environments, about 1.4 GB less. After every physics step the simulator compares what the step needed with
   each capacity and stops with an error if a buffer was too small, so a task that needs more fails instead of
-  losing contacts. Each simulator reports its peak needs in the native log when it exits.
+  losing contacts. Each simulator reports its peak needs in the native log when it closes.
 
 The Policy receives `images.head`, `images.left_wrist`, and `images.right_wrist` as RGB uint8 arrays,
 `language.instruction` as a string, and `state.joints` as 14 float32 values ordered as six left-arm joints,
