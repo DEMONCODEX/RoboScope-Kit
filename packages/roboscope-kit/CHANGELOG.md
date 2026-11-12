@@ -28,6 +28,18 @@ Platform-only release notes from earlier versions are omitted; other changes rel
   tool bridge. It records the native RoboDojo run ID with each episode, so retries remain distinguishable,
   allows the agent up to twelve minutes to finish after the simulator's verdict, and can share one local SAM3
   service across Policy replicas.
+- Start RoboDojo simulators through shared start slots (manifest default `simulator_start_slots`, 2): at most
+  that many are between their launch and 15 s after their first observation, because a simulator that renders
+  its first frames while five or more others are starting can produce them with a colour cast. The manifest
+  default `simulator_start_free_gpu_mib` (0, off) also holds a launch until the GPU has that much free memory
+  for each simulator still starting.
+- Add the opt-in RoboDojo manifest defaults `deferred_batch_planner` and `compact_physx_buffers`, which lower a
+  simulator's GPU memory by about 3.1–3.5 GB without changing what it simulates or renders: cuRobo's batch
+  planner, which no RoboDojo code calls, is built on its first use, and PhysX's GPU buffers are sized for one
+  table. With compact buffers the simulator checks every physics step and stops with an error when a step
+  needed more than a buffer holds.
+- The PyRUA shared-SAM3 wrapper makes the service's first two requests when the Policy loads, so that the
+  service takes its working GPU memory before the simulators start.
 - Let the RoboDojo builder create a separate environment over a verified existing runtime
   (`ROBODOJO_BASE_RUNTIME`) when disk space prevents a full independent installation; it records the reused
   dependency provenance.

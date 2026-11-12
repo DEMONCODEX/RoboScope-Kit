@@ -58,6 +58,19 @@ the Policy config. Keep the service running until evaluation finishes. The wrapp
 local SAM3 and this exact `pyrua_policy.py`, and fails the Policy if the service is unavailable. The vendored
 service and its attribution are described in [`pyrua-shared-sam3/README.md`](pyrua-shared-sam3/README.md).
 
+When the Policy loads, the wrapper sends the service two requests on a blank image, so the service holds its
+working GPU memory (about 6.3 GB) before any simulator starts.
+
+## Several Workers on one GPU
+
+Each Worker runs one simulator, and the number that fits is set by GPU memory. In the installed
+`benchmark-manifest.json`, set `deferred_batch_planner` and `compact_physx_buffers` to `true`: a simulator then
+peaks at 4.9–7.4 GB depending on the task, instead of 8.1–11.0 GB. Set `simulator_start_free_gpu_mib` to `8000`
+so that a simulator starts only when the GPU has room for the heaviest task, and run with the shared SAM3
+service and `--concurrency K --replicas K`. On an RTX 4090 with 48 GB, K=7 evaluated every task of both suites
+without running out of memory; the switches and their validation are described in
+[RoboDojo's README](../../benchmarks/robodojo/README.md).
+
 ## Results
 
 On one RTX 4090 48 GB with GPT-6.1 Terra, two runs of 8 episodes from four tasks took 3,438.6 s of evaluation
