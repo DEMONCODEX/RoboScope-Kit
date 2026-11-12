@@ -85,6 +85,10 @@ with four Workers and shared SAM3, against 10,855.4 s with one Worker: 3.16× th
 - The SAM3 service listens on loopback by default and has no authentication. It serializes SAM3 requests, so
   replica throughput and memory headroom depend on the workload.
 - The example enforces no request budget for the model service.
+- An episode that PyRUA ends at its tool-call budget (`--max-turns`, 100) or its time budget (`--budget-s`,
+  5,400 s) counts with the simulator's verdict. A model-service failure in the middle of an episode
+  (PyRUA's `planner_error`) fails the Policy instead: the Worker restarts once and runs the shard again, and a
+  second failure on the same Worker stops the evaluation.
 - The published PyRUA-Lean leaderboard entry used a different model from this example's Terra configuration, so
   a result here is not a reproduction of that leaderboard score.
 - When comparing runs, record the model, reasoning effort, task, layout, seed, replica count, memory usage, and

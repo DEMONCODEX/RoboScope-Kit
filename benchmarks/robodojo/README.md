@@ -38,8 +38,9 @@ memory for each simulator still starting; a Worker that waits says so in its nat
 
 Two opt-in manifest defaults lower a simulator's GPU memory without changing what it simulates or renders:
 
-- `deferred_batch_planner` builds cuRobo's batch motion planner on its first use instead of at startup. No
-  RoboDojo code at the pinned revision calls that planner, which holds about 1.8 GB.
+- `deferred_batch_planner` builds cuRobo's batch motion planner on its first use instead of at startup. The
+  planner holds about 1.8 GB; a run that never plans a batch, such as a joint-position Policy, never builds it,
+  and the first batch plan of any other run builds and warms it the same way as at startup.
 - `compact_physx_buffers` sizes PhysX's GPU buffers for one table instead of Isaac Lab's defaults for thousands
   of environments, about 1.4 GB less. After every physics step the simulator compares what the step needed with
   each capacity and stops with an error if a buffer was too small, so a task that needs more fails instead of

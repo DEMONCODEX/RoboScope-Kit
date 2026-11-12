@@ -35,9 +35,12 @@ Platform-only release notes from earlier versions are omitted; other changes rel
   for each simulator still starting.
 - Add the opt-in RoboDojo manifest defaults `deferred_batch_planner` and `compact_physx_buffers`, which lower a
   simulator's GPU memory by about 3.1–3.5 GB without changing what it simulates or renders: cuRobo's batch
-  planner, which no RoboDojo code calls, is built on its first use, and PhysX's GPU buffers are sized for one
-  table. With compact buffers the simulator checks every physics step and stops with an error when a step
-  needed more than a buffer holds.
+  planner is built on its first use, which a joint-position Policy never makes, and PhysX's GPU buffers are
+  sized for one table. With compact buffers the simulator checks every physics step and stops with an error
+  when a step needed more than a buffer holds.
+- Accept, in the PyRUA-Lean example, an episode that PyRUA ended at its tool-call budget (`call_budget`) or its
+  time budget (`timeout`) as a played episode with the simulator's verdict. The example used to treat both as a
+  failed Policy, which cost the Worker its single restart and reran the shard.
 - The PyRUA shared-SAM3 wrapper makes the service's first two requests when the Policy loads, so that the
   service takes its working GPU memory before the simulators start.
 - Let the RoboDojo builder create a separate environment over a verified existing runtime
