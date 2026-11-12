@@ -12,7 +12,7 @@ from urllib import error as urllib_error
 from urllib import request as urllib_request
 from urllib.parse import urlsplit
 
-EXPECTED_POLICY = "359d0ed3734bce2bc7713fe34dd55044ed5f495fc7452838c0af9422168404cd"
+EXPECTED_POLICY = "b766c2b57ce491c3931179a77e723c19eeebe4fc21de1e14aa4158d4974476ea"
 EXPECTED_HTTP = "93a55e38e5d51aaa302c5fb4edb5d58635bee26d77d65d6a74f93668afda29a8"
 EXPECTED_LOCAL = "b33d89de366930daafb7cf789155101a4d41cb3f1f526e809989c6c0ea74629c"
 HTTP_SOURCE = Path(__file__).resolve().parent / "pyrua-shared-sam3/sam3_http.py"

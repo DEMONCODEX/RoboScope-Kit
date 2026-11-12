@@ -71,9 +71,17 @@ def action_or_control(actions: list[dict[str, Any]]) -> ActionChunk | EpisodeCon
     return ActionChunk(row)
 
 
+# PyRUA ends an episode that was played in one of these ways. At its call budget the agent may still call
+# finish and exits normally; at its time budget PyRUA stops the agent process. Any other status is a host or
+# provider failure, which fails the evaluation.
+ENDED_BY_AGENT = "completed"
+ENDED_AT_A_BUDGET = ("call_budget", "timeout")
+
+
 def validate_result(result: dict[str, Any] | None, event_path: Path, verdict: bool) -> None:
-    if (not isinstance(result, dict) or result.get("status") != "completed"
-            or result.get("codex_returncode") != 0
+    status = result.get("status") if isinstance(result, dict) else None
+    if (status not in (ENDED_BY_AGENT, *ENDED_AT_A_BUDGET)
+            or (status != "timeout" and result.get("codex_returncode") != 0)
             or type(result.get("environment_success")) is not bool
             or result["environment_success"] != verdict):
         raise RuntimeError("PyRUA agent result does not match the simulator verdict")
@@ -97,10 +105,10 @@ def validate_result(result: dict[str, Any] | None, event_path: Path, verdict: bo
     if not completed["python"]:
         raise RuntimeError("PyRUA did not complete a Python tool call")
     if finish is None:
-        if not verdict:
+        if not verdict and status == ENDED_BY_AGENT:
             raise RuntimeError("unsuccessful PyRUA episode has no finish tool call")
     elif (not isinstance(finish, dict) or finish.get("status") not in ("success", "failure", "stuck")
-          or not completed["finish"]):
+          or (not completed["finish"] and status != "timeout")):
         raise RuntimeError("PyRUA finish tool result is missing or invalid")
 
 
