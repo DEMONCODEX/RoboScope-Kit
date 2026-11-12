@@ -30,6 +30,21 @@ Isaac Sim does not exit when Vulkan runs out of GPU memory; it waits in an error
 native log for `ERROR_OUT_OF_DEVICE_MEMORY`, stops the simulator and reports an OOM, so the Kit lowers the GPU's
 concurrency and requeues the shard.
 
+Simulators start through shared start slots. A simulator that renders its first frames while five or more others
+are starting can produce them with a colour cast, so at most `simulator_start_slots` simulators (default 2; 0
+disables the slots) are between their launch and 15 s after their first observation. With
+`simulator_start_free_gpu_mib` (default 0, off), a simulator also starts only when its GPU has that much free
+memory for each simulator still starting; a Worker that waits says so in its native log once a minute.
+
+Two opt-in manifest defaults lower a simulator's GPU memory without changing what it simulates or renders:
+
+- `deferred_batch_planner` builds cuRobo's batch motion planner on its first use instead of at startup. No
+  RoboDojo code at the pinned revision calls that planner, which holds about 1.8 GB.
+- `compact_physx_buffers` sizes PhysX's GPU buffers for one table instead of Isaac Lab's defaults for thousands
+  of environments, about 1.4 GB less. After every physics step the simulator compares what the step needed with
+  each capacity and stops with an error if a buffer was too small, so a task that needs more fails instead of
+  losing contacts. Each simulator reports its peak needs in the native log when it exits.
+
 The Policy receives `images.head`, `images.left_wrist`, and `images.right_wrist` as RGB uint8 arrays,
 `language.instruction` as a string, and `state.joints` as 14 float32 values ordered as six left-arm joints,
 left gripper, six right-arm joints, right gripper. `state.ee_pose` contains both end-effector poses as
