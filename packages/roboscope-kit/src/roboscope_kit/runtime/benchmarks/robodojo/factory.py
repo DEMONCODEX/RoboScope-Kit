@@ -101,4 +101,8 @@ class RoboDojoBenchmarkFactory:
             physics_threads=manifest.defaults.get("physics_threads"),
             observation_queue_size=manifest.defaults.get("observation_queue_size", 0),
             envs_per_worker=manifest.defaults.get("envs_per_worker", 1),
+            deferred_batch_planner=manifest.defaults.get("deferred_batch_planner", False),
+            compact_physx_buffers=manifest.defaults.get("compact_physx_buffers", False),
+            simulator_start_slots=manifest.defaults.get("simulator_start_slots", 2),
+            simulator_start_free_gpu_mib=manifest.defaults.get("simulator_start_free_gpu_mib", 0),
         ))

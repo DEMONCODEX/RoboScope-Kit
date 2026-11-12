@@ -7,11 +7,13 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import fcntl
 import json
 import math
 import os
 import signal
 import subprocess
+import time
 import uuid
 from pathlib import Path
 
@@ -22,6 +24,12 @@ LAYOUT_PASSES = 3
 # exiting, so the Worker watches the native log for it.
 OOM_MARKER = b"ERROR_OUT_OF_DEVICE_MEMORY"
 OOM_POLL_S = 5.0
+# A simulator that takes its first camera frames while several others are still starting can render them
+# with a colour cast. A start slot is held from the launch until this long after the first observation.
+START_HOLD_S = 15.0
+START_POLL_S = 0.5
+START_MEMORY_POLL_S = 5.0
+START_MEMORY_LOG_S = 60.0
 
 
 def parse_args() -> argparse.Namespace:
@@ -42,6 +50,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--unpaced-render", action="store_true")
     parser.add_argument("--control-state-reuse", action="store_true")
     parser.add_argument("--physics-threads", type=int, choices=(1, 4, 8))
+    parser.add_argument("--deferred-batch-planner", action="store_true")
+    parser.add_argument("--compact-physx-buffers", action="store_true")
+    parser.add_argument("--simulator-start-slots", type=int, default=0)
+    parser.add_argument("--simulator-start-free-gpu-mib", type=int, default=0)
     parser.add_argument("--envs-per-worker", type=int, default=1)
     parser.add_argument("--step-observation-updates", action="store_true")
     parser.add_argument("--interactive-policy", action="store_true")
@@ -54,6 +66,10 @@ def parse_args() -> argparse.Namespace:
         parser.error("interactive policies require one environment and no observation overlap")
     if args.envs_per_worker < 1:
         parser.error("envs per worker must be positive")
+    if args.simulator_start_slots < 0 or args.simulator_start_free_gpu_mib < 0:
+        parser.error("simulator start slots and free GPU memory must be nonnegative")
+    if args.simulator_start_free_gpu_mib and not args.simulator_start_slots:
+        parser.error("a free GPU memory requirement needs simulator start slots")
     if args.observation_stride < 1:
         parser.error("observation stride must be positive")
     return args
@@ -75,36 +91,137 @@ def _descendants(pid: int) -> list[int]:
     return found
 
 
-def _run_once(command: list[str], root: Path, env: dict, log, log_path: Path) -> int:
-    log.flush()
-    position = log_path.stat().st_size
-    process = subprocess.Popen(command, cwd=root, env=env, stdout=log, stderr=subprocess.STDOUT)
-    while True:
+def gpu_free_mib(gpu_id: str) -> int | None:
+    """Free memory of one GPU in MiB, or ``None`` when ``nvidia-smi`` does not report it."""
+
+    try:
+        output = subprocess.run(
+            ["nvidia-smi", f"--id={gpu_id}", "--query-gpu=memory.total,memory.used",
+             "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=30, check=True,
+        ).stdout
+        total, used = (int(value) for value in output.strip().splitlines()[0].split(","))
+    except (OSError, subprocess.SubprocessError, ValueError, IndexError):
+        return None
+    return total - used
+
+
+class StartGate:
+    """Let at most ``slots`` simulators of a run be starting at once; zero slots disables the gate.
+
+    The Workers of a run share ``directory``. A slot is an exclusive lock on one of its files, so a Worker
+    that dies releases its slot. With ``free_gpu_mib``, a simulator also starts only when its GPU has that
+    much free memory for it and for every other simulator that is still starting.
+    """
+
+    def __init__(self, directory: Path, slots: int, *, gpu_id: str = "0", free_gpu_mib: int = 0) -> None:
+        self.directory, self.slots = directory, slots
+        self.gpu_id, self.free_gpu_mib = gpu_id, free_gpu_mib
+        self._held: int | None = None
+        self._slot = -1
+
+    @property
+    def held(self) -> bool:
+        return self._held is not None
+
+    def _try_lock(self, slot: int) -> int | None:
+        descriptor = os.open(self.directory / f"slot-{slot}", os.O_CREAT | os.O_RDWR, 0o600)
         try:
-            return process.wait(timeout=OOM_POLL_S)
-        except subprocess.TimeoutExpired:
-            pass
-        with log_path.open("rb") as handle:
-            handle.seek(max(0, position - len(OOM_MARKER)))
-            chunk = handle.read()
-            position = handle.tell()
-        if OOM_MARKER in chunk:
-            for pid in [*_descendants(process.pid), process.pid]:
-                with contextlib.suppress(ProcessLookupError):
-                    os.kill(pid, signal.SIGKILL)
-            process.wait()
-            # The marker text makes the Kit classify this Worker failure as an OOM, which lowers the GPU's
-            # concurrency and requeues the shard instead of retrying it at the same concurrency.
-            raise RuntimeError(
-                f"RoboDojo simulator ran out of GPU memory: {OOM_MARKER.decode()}; see {log_path}"
-            )
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            os.close(descriptor)
+            return None
+        return descriptor
+
+    def _others_starting(self) -> int:
+        count = 0
+        for slot in range(self.slots):
+            if slot == self._slot:
+                continue
+            descriptor = self._try_lock(slot)
+            if descriptor is None:
+                count += 1
+            else:
+                os.close(descriptor)
+        return count
+
+    def acquire(self, log=None) -> None:
+        if not self.slots or self.held:
+            return
+        self.directory.mkdir(parents=True, exist_ok=True)
+        while not self.held:
+            for slot in range(self.slots):
+                descriptor = self._try_lock(slot)
+                if descriptor is not None:
+                    self._held, self._slot = descriptor, slot
+                    break
+            else:
+                time.sleep(START_POLL_S)
+        next_log = time.monotonic()
+        while self.free_gpu_mib:
+            free = gpu_free_mib(self.gpu_id)
+            needed = self.free_gpu_mib * (1 + self._others_starting())
+            if free is None or free >= needed:
+                return
+            if log is not None and time.monotonic() >= next_log:
+                next_log = time.monotonic() + START_MEMORY_LOG_S
+                print(f"[roboscope] waiting to start the simulator: GPU {self.gpu_id} has {free} MiB free, "
+                      f"{needed} MiB needed", file=log, flush=True)
+            time.sleep(START_MEMORY_POLL_S)
+
+    def release(self) -> None:
+        if self._held is not None:
+            os.close(self._held)
+            self._held, self._slot = None, -1
 
 
-def _run_evaluator(command: list[str], root: Path, env: dict, log, log_path: Path) -> None:
+def _run_once(command: list[str], root: Path, env: dict, log, log_path: Path, gate: StartGate) -> int:
+    first_observation = log_path.with_name(f"{log_path.stem}.first-observation-{uuid.uuid4().hex}")
+    env = {**env, "ROBOSCOPE_ROBODOJO_FIRST_OBSERVATION": str(first_observation)}
+    gate.acquire(log)
+    try:
+        log.flush()
+        position = log_path.stat().st_size
+        process = subprocess.Popen(command, cwd=root, env=env, stdout=log, stderr=subprocess.STDOUT)
+        release_at = next_scan = None
+        while True:
+            try:
+                return process.wait(timeout=START_POLL_S if gate.held else OOM_POLL_S)
+            except subprocess.TimeoutExpired:
+                pass
+            now = time.monotonic()
+            if gate.held:
+                if release_at is None and first_observation.exists():
+                    release_at = now + START_HOLD_S
+                if release_at is not None and now >= release_at:
+                    gate.release()
+                if next_scan is not None and now < next_scan:
+                    continue
+            next_scan = now + OOM_POLL_S
+            with log_path.open("rb") as handle:
+                handle.seek(max(0, position - len(OOM_MARKER)))
+                chunk = handle.read()
+                position = handle.tell()
+            if OOM_MARKER in chunk:
+                for pid in [*_descendants(process.pid), process.pid]:
+                    with contextlib.suppress(ProcessLookupError):
+                        os.kill(pid, signal.SIGKILL)
+                process.wait()
+                # The marker text makes the Kit classify this Worker failure as an OOM, which lowers the GPU's
+                # concurrency and requeues the shard instead of retrying it at the same concurrency.
+                raise RuntimeError(
+                    f"RoboDojo simulator ran out of GPU memory: {OOM_MARKER.decode()}; see {log_path}"
+                )
+    finally:
+        gate.release()
+        first_observation.unlink(missing_ok=True)
+
+
+def _run_evaluator(command: list[str], root: Path, env: dict, log, log_path: Path, gate: StartGate) -> None:
     # RoboDojo's resume manifest is keyed by run_id; preserve it across bounded
     # restarts for the upstream PhysX fatal-restart exit codes.
     for attempt in range(4):
-        returncode = _run_once(command, root, env, log, log_path)
+        returncode = _run_once(command, root, env, log, log_path, gate)
         if returncode == 0:
             return
         if returncode not in (99, 134, 139, -6, -11) or attempt == 3:
@@ -173,7 +290,7 @@ def run_item(args: argparse.Namespace, item: WorkItem) -> WorkResult:
     }
     for name in (
         "ROBODOJO_ASYNC_VIDEO", "ROBODOJO_UNPACED_RENDER", "ROBODOJO_CONTROL_STATE_REUSE",
-        "ROBODOJO_PHYSICS_THREADS",
+        "ROBODOJO_PHYSICS_THREADS", "ROBODOJO_DEFERRED_BATCH_PLANNER", "ROBODOJO_COMPACT_PHYSX_BUFFERS",
     ):
         env.pop(name, None)
     if args.async_video:
@@ -184,6 +301,14 @@ def run_item(args: argparse.Namespace, item: WorkItem) -> WorkResult:
         env["ROBODOJO_CONTROL_STATE_REUSE"] = "1"
     if args.physics_threads is not None:
         env["ROBODOJO_PHYSICS_THREADS"] = str(args.physics_threads)
+    if getattr(args, "deferred_batch_planner", False):
+        env["ROBODOJO_DEFERRED_BATCH_PLANNER"] = "1"
+    if getattr(args, "compact_physx_buffers", False):
+        env["ROBODOJO_COMPACT_PHYSX_BUFFERS"] = "1"
+    gate = StartGate(
+        args.output_dir / "simulator-start-slots", getattr(args, "simulator_start_slots", 0),
+        gpu_id=args.gpu_id, free_gpu_mib=getattr(args, "simulator_start_free_gpu_mib", 0),
+    )
     command = [
         str(args.benchmark_python), "-u", str(root / "src/eval_client/main.py"),
         "--task_name", task, "--env_cfg_type", "arx_x5", "--num_envs", "1",
@@ -223,7 +348,7 @@ def run_item(args: argparse.Namespace, item: WorkItem) -> WorkResult:
                 "EVAL_NUM": str(len(requested)),
             })
             command[command.index("--num_envs") + 1] = str(envs)
-            _run_evaluator(command, root, env, log, log_path)
+            _run_evaluator(command, root, env, log, log_path, gate)
             if not result_path.is_file():
                 raise RuntimeError(f"RoboDojo did not write results; see {log_path}")
             result_paths.append(str(result_path))

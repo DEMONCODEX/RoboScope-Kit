@@ -1,0 +1,129 @@
+--- a/env/planner_manager/curobo_planner.py
++++ b/env/planner_manager/curobo_planner.py
+@@ -1,4 +1,5 @@
+ from copy import deepcopy
++import os
+ 
+ from curobo.batch_motion_planner import BatchMotionPlanner, MotionPlannerCfg
+ from curobo.inverse_kinematics import InverseKinematics, InverseKinematicsCfg
+@@ -19,6 +20,10 @@
+ from env.global_configs import BATCH_NUM
+ from utils.transformer import calculate_target_pose
+ 
++# Disabled unless requested. The batch planner holds about 2 GB of GPU memory per arm pair from startup;
++# when requested, it is built, warmed up and prewarmed the same way on its first use instead.
++_DEFERRED_BATCH_PLANNER = os.environ.get("ROBODOJO_DEFERRED_BATCH_PLANNER") == "1"
++
+ _curobo_runtime.cuda_graph_reset = True
+ 
+ 
+@@ -76,8 +81,8 @@
+ 
+         self.motion_planner = MotionPlanner(self._build_motion_planner_cfg(1))
+         self.motion_planner.warmup(enable_graph=self.use_graph_planner, num_warmup_iterations=5)
+-        self.motion_planner_batch = BatchMotionPlanner(self._build_motion_planner_cfg(self._batch_max_size))
+-        self.motion_planner_batch.warmup(enable_graph=self.use_graph_planner, num_warmup_iterations=5)
++        if not _DEFERRED_BATCH_PLANNER:
++            self._build_batch_planner()
+ 
+         planner_joint_names = list(self.motion_planner.joint_names)
+         if planner_joint_names != self.cspace_joint_names:
+@@ -99,7 +104,8 @@
+ 
+         # Pre-compute pad-slot tensors for BatchMotionPlanner.plan_pose
+         # (TrajOpt requires inputs at exactly max_batch_size).
+-        self._build_batch_pad_templates()
++        if not _DEFERRED_BATCH_PLANNER:
++            self._build_batch_pad_templates()
+ 
+         if self.use_cuda_graph:
+             self._prewarm_alternate_modes()
+@@ -110,8 +116,8 @@
+                 self.ik_solver.destroy()
+             if hasattr(self, "motion_planner"):
+                 self.motion_planner.destroy()
+-            if hasattr(self, "motion_planner_batch"):
+-                self.motion_planner_batch.destroy()
++            if "_motion_planner_batch" in self.__dict__:
++                self._motion_planner_batch.destroy()
+         except Exception:
+             pass
+ 
+@@ -538,6 +544,19 @@
+             max_goalset=1,
+         )
+ 
++    def _build_batch_planner(self):
++        self._motion_planner_batch = BatchMotionPlanner(self._build_motion_planner_cfg(self._batch_max_size))
++        self._motion_planner_batch.warmup(enable_graph=self.use_graph_planner, num_warmup_iterations=5)
++
++    @property
++    def motion_planner_batch(self):
++        if "_motion_planner_batch" not in self.__dict__:
++            self._build_batch_planner()
++            self._build_batch_pad_templates()
++            if self.use_cuda_graph:
++                self._prewarm_batch_planner()
++        return self._motion_planner_batch
++
+     def _build_batch_pad_templates(self):
+         """Pre-compute pad-slot tensors for ``BatchMotionPlanner.plan_pose``.
+ 
+@@ -590,6 +609,30 @@
+         except Exception:
+             pass
+ 
++        if not _DEFERRED_BATCH_PLANNER:
++            self._prewarm_batch_planner()
++
++        try:
++            ik_retract = self.ik_solver.default_joint_state.clone().unsqueeze(0)
++            ik_js = JointState.from_position(
++                ik_retract.position,
++                joint_names=list(self.ik_solver.joint_names),
++            )
++            ik_kin = self.ik_solver.compute_kinematics(ik_js)
++            ik_goal = GoalToolPose.from_poses(
++                ik_kin.tool_poses.to_dict(),
++                ordered_tool_frames=list(self.ik_solver.tool_frames),
++                num_goalset=1,
++            )
++            self.ik_solver.solve_pose(
++                goal_tool_poses=ik_goal,
++                current_state=ik_js,
++                return_seeds=1,
++            )
++        except Exception:
++            pass
++
++    def _prewarm_batch_planner(self):
+         try:
+             batch_position = self.motion_planner_batch.default_joint_state.position.view(1, -1).repeat(
+                 self._batch_max_size, 1
+@@ -612,26 +655,6 @@
+             )
+         except Exception:
+             pass
+-
+-        try:
+-            ik_retract = self.ik_solver.default_joint_state.clone().unsqueeze(0)
+-            ik_js = JointState.from_position(
+-                ik_retract.position,
+-                joint_names=list(self.ik_solver.joint_names),
+-            )
+-            ik_kin = self.ik_solver.compute_kinematics(ik_js)
+-            ik_goal = GoalToolPose.from_poses(
+-                ik_kin.tool_poses.to_dict(),
+-                ordered_tool_frames=list(self.ik_solver.tool_frames),
+-                num_goalset=1,
+-            )
+-            self.ik_solver.solve_pose(
+-                goal_tool_poses=ik_goal,
+-                current_state=ik_js,
+-                return_seeds=1,
+-            )
+-        except Exception:
+-            pass
+ 
+     def _pad_to_batch_size(self, goal_tool_poses, current_state):
+         """Pad goal/current to exactly ``self._batch_max_size``.

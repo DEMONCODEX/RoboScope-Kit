@@ -57,6 +57,13 @@ def install_shared_sam3(endpoint):
     client = StrictClient(endpoint)
     if not client.alive():
         raise RuntimeError("shared SAM3 service is not ready")
+    # The service allocates about 2 GB of GPU memory on its first requests. Make them now, on a blank
+    # camera-sized image, so that this memory is taken before the simulators start.
+    import numpy
+
+    blank = numpy.zeros((480, 640, 3), dtype=numpy.uint8)
+    client.segment(blank, text_prompt="object")
+    client.segment(blank, point=[240, 320], min_score=0.0)
 
     original = sam3_local.shared
 

@@ -1,0 +1,109 @@
+--- a/env/environment/base_env.py
++++ b/env/environment/base_env.py
+@@ -12,6 +12,7 @@
+ 
+ from env.environment.isaac.isaac_rl_env import IsaacRLEnv
+ from env.seeding import seed_everywhere
++import roboscope_physx_buffers
+ 
+ DEFAULT_SIM_DEVICE = "cpu"
+ DEFAULT_USE_FABRIC = False
+@@ -178,6 +179,7 @@
+             config (DictConfig): The configuration for the environment. This comes from hydra yaml.
+         """
+         physx_config = _resolve_sim_section(DEFAULT_PHYSX_CONFIG, self.config.get("physx"))
++        roboscope_physx_buffers.configure(physx_config)
+         render_config = _resolve_sim_section(DEFAULT_RENDER_CONFIG, self.config.get("render"))
+         frequency_settings = _resolve_sim_section(
+             DEFAULT_FREQUENCY_SETTINGS,
+--- a/env/environment/isaac/direct_rl_env.py
++++ b/env/environment/isaac/direct_rl_env.py
+@@ -1,5 +1,7 @@
+ from isaaclab.envs.direct_rl_env import DirectRLEnv
+ 
++import roboscope_physx_buffers
++
+ 
+ class CustomDirectRLEnv(DirectRLEnv):
+     def sim_step(self, render: bool = True):
+@@ -9,6 +11,7 @@
+             self._sim_step_counter += 1
+             self.scene.write_data_to_sim()
+             self.sim.step(render=False)
++            roboscope_physx_buffers.check()
+             if (
+                 self.cfg.sim.render_interval > 0
+                 and self._sim_step_counter % self.cfg.sim.render_interval == 0
+--- /dev/null
++++ b/roboscope_physx_buffers.py
+@@ -0,0 +1,70 @@
++"""Opt-in compact PhysX GPU buffers for one table per simulator, checked after every physics step."""
++
++import atexit
++import os
++
++_ENABLED = os.environ.get("ROBODOJO_COMPACT_PHYSX_BUFFERS") == "1"
++# PhysX allocates its GPU buffers at these capacities when the simulation starts. RoboDojo keeps Isaac Lab's
++# defaults, which are sized for thousands of environments. Each capacity maps to the PhysX scene statistic that
++# reports what a step needed of it.
++_BUFFERS = {
++    "gpu_max_rigid_contact_count": (524288, "gpu_mem_rigid_contact_count"),
++    "gpu_max_rigid_patch_count": (32768, "gpu_mem_rigid_patch_count"),
++    "gpu_found_lost_pairs_capacity": (262144, "gpu_mem_found_lost_pairs"),
++    "gpu_found_lost_aggregate_pairs_capacity": (1048576, "gpu_mem_found_lost_aggregate_pairs"),
++    "gpu_total_aggregate_pairs_capacity": (262144, "gpu_mem_total_aggregate_pairs"),
++    "gpu_collision_stack_size": (16777216, "gpu_mem_collision_stack_size"),
++    "gpu_temp_buffer_capacity": (4194304, "gpu_mem_temp_buffer_capacity"),
++    "gpu_max_soft_body_contacts": (262144, "gpu_mem_deformable_volume_contacts"),
++    "gpu_max_particle_contacts": (262144, "gpu_mem_particle_contacts"),
++}
++# PhysX grows its heap on demand in blocks of this size, so the heap has no limit to check.
++_HEAP_BLOCK_BYTES = 16777216
++_PHYSICS_SCENE = "/physicsScene"
++_peak = {}
++_handles = None
++
++
++def configure(physx_config):
++    """Replace the capacities in RoboDojo's PhysX settings before the simulation is created."""
++    if not _ENABLED:
++        return
++    physx_config.update({name: capacity for name, (capacity, _statistic) in _BUFFERS.items()})
++    physx_config["gpu_heap_capacity"] = _HEAP_BLOCK_BYTES
++    print("[roboscope_physx_buffers] compact PhysX GPU buffers enabled", flush=True)
++
++
++def _report():
++    print(
++        "[roboscope_physx_buffers] peak need of each compact buffer (needed, capacity): "
++        + ", ".join(f"{name} ({_peak.get(name, 0)}, {capacity})" for name, (capacity, _statistic) in _BUFFERS.items()),
++        flush=True,
++    )
++
++
++def check():
++    """Stop the simulator when a step needed more than a compact buffer holds; PhysX would drop the excess."""
++    global _handles
++    if not _ENABLED:
++        return
++    if _handles is None:
++        import omni.usd
++        from omni.physx import get_physx_statistics_interface
++        from omni.physx.bindings._physx import PhysicsSceneStats
++        from pxr import PhysicsSchemaTools
++
++        _handles = (get_physx_statistics_interface(), omni.usd.get_context(),
++                    PhysicsSchemaTools.sdfPathToInt(_PHYSICS_SCENE), PhysicsSceneStats())
++        atexit.register(_report)
++    interface, context, scene, statistics = _handles
++    if not interface.get_physx_scene_statistics(context.get_stage_id(), scene, statistics):
++        raise RuntimeError("compact PhysX buffers need the PhysX scene statistics, which are unavailable")
++    for name, (capacity, statistic) in _BUFFERS.items():
++        needed = getattr(statistics, statistic)
++        if needed > _peak.get(name, 0):
++            _peak[name] = needed
++        if needed > capacity:
++            raise RuntimeError(
++                f"a physics step needed {needed} of {name}, above the compact capacity {capacity}; "
++                "set the manifest default compact_physx_buffers to false for this task"
++            )

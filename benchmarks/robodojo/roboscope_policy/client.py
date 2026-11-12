@@ -30,6 +30,8 @@ class WsModelClient:
             raise ValueError("RoboDojo observation queue size must be between 0 and 10")
         self.pending = deque()
         self.executor = ThreadPoolExecutor(max_workers=1) if self.queue_size else None
+        # The Worker holds a simulator start slot until this simulator has rendered its first observation.
+        self.first_observation = os.environ.get("ROBOSCOPE_ROBODOJO_FIRST_OBSERVATION")
 
     def call(self, func_name=None, obs=None, **_kwargs):
         if func_name != "reset" or obs is not None:
@@ -58,6 +60,10 @@ class WsModelClient:
         return episode_id
 
     def act(self, observation):
+        if self.first_observation:
+            with open(self.first_observation, "w", encoding="utf-8"):
+                pass
+            self.first_observation = None
         self._flush()
         with PolicyClient(self.socket_path, timeout_s=900) as client:
             answer = client.act(observation)

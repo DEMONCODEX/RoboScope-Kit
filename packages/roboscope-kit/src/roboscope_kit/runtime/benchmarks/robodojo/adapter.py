@@ -32,6 +32,10 @@ class RoboDojoRuntimeConfig:
     physics_threads: int | None = None
     observation_queue_size: int = 0
     envs_per_worker: int = 1
+    deferred_batch_planner: bool = False
+    compact_physx_buffers: bool = False
+    simulator_start_slots: int = 2
+    simulator_start_free_gpu_mib: int = 0
 
     def __post_init__(self) -> None:
         if self.suite not in SUITES:
@@ -44,8 +48,14 @@ class RoboDojoRuntimeConfig:
             raise ValueError("RoboDojo shard size and CPU threads must be positive; seed must be nonnegative")
         if any(type(value) is not bool for value in (
             self.async_video, self.unpaced_render, self.control_state_reuse,
+            self.deferred_batch_planner, self.compact_physx_buffers,
         )):
             raise ValueError("RoboDojo runtime switches must be booleans")
+        for name in ("simulator_start_slots", "simulator_start_free_gpu_mib"):
+            if type(getattr(self, name)) is not int or getattr(self, name) < 0:
+                raise ValueError(f"RoboDojo {name} must be a nonnegative integer")
+        if self.simulator_start_free_gpu_mib and not self.simulator_start_slots:
+            raise ValueError("RoboDojo simulator_start_free_gpu_mib requires simulator_start_slots")
         if self.physics_threads is not None and (
             type(self.physics_threads) is not int or self.physics_threads not in (1, 4, 8)
         ):
@@ -116,6 +126,10 @@ class RoboDojoBenchmarkAdapter:
                 *(("--physics-threads", str(self.config.physics_threads))
                   if self.config.physics_threads is not None else ()),
                 "--envs-per-worker", str(self.config.envs_per_worker),
+                *(("--deferred-batch-planner",) if self.config.deferred_batch_planner else ()),
+                *(("--compact-physx-buffers",) if self.config.compact_physx_buffers else ()),
+                "--simulator-start-slots", str(self.config.simulator_start_slots),
+                "--simulator-start-free-gpu-mib", str(self.config.simulator_start_free_gpu_mib),
             ),
             cwd=self.config.benchmark_root,
             env={
@@ -161,6 +175,10 @@ class RoboDojoBenchmarkAdapter:
                 "physics_threads": self.config.physics_threads,
                 "observation_queue_size": self.config.observation_queue_size,
                 "envs_per_worker": self.config.envs_per_worker,
+                "deferred_batch_planner": self.config.deferred_batch_planner,
+                "compact_physx_buffers": self.config.compact_physx_buffers,
+                "simulator_start_slots": self.config.simulator_start_slots,
+                "simulator_start_free_gpu_mib": self.config.simulator_start_free_gpu_mib,
             },
             "bound_hint": "gpu_infer",
         }

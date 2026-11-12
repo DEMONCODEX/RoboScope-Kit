@@ -28,7 +28,11 @@
     "control_state_reuse": false,
     "physics_threads": null,
     "observation_queue_size": 0,
-    "envs_per_worker": 1
+    "envs_per_worker": 1,
+    "deferred_batch_planner": false,
+    "compact_physx_buffers": false,
+    "simulator_start_slots": 2,
+    "simulator_start_free_gpu_mib": 0
   },
   "benchmark_protocols": {
     "robodojo": {
