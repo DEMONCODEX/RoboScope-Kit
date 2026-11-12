@@ -52,7 +52,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--physics-threads", type=int, choices=(1, 4, 8))
     parser.add_argument("--deferred-batch-planner", action="store_true")
     parser.add_argument("--compact-physx-buffers", action="store_true")
-    parser.add_argument("--compact-editor-viewport", action="store_true")
     parser.add_argument("--simulator-start-slots", type=int, default=0)
     parser.add_argument("--simulator-start-free-gpu-mib", type=int, default=0)
     parser.add_argument("--envs-per-worker", type=int, default=1)
@@ -316,15 +315,11 @@ def run_item(args: argparse.Namespace, item: WorkItem) -> WorkResult:
         args.output_dir / "simulator-start-slots", getattr(args, "simulator_start_slots", 0),
         gpu_id=args.gpu_id, free_gpu_mib=getattr(args, "simulator_start_free_gpu_mib", 0),
     )
-    kit_args = "--enable isaacsim.replicator.behavior --enable isaacsim.sensors.camera"
-    if getattr(args, "compact_editor_viewport", False):
-        # Isaac Lab's Kit application renders an editor viewport at 1280x720 even when headless. The Policy
-        # never sees it; its render buffers shrink with its resolution.
-        kit_args += " --/app/renderer/resolution/width=64 --/app/renderer/resolution/height=64"
     command = [
         str(args.benchmark_python), "-u", str(root / "src/eval_client/main.py"),
         "--task_name", task, "--env_cfg_type", "arx_x5", "--num_envs", "1",
-        "--enable_cameras", "--kit_args", kit_args,
+        "--enable_cameras", "--kit_args",
+        "--enable isaacsim.replicator.behavior --enable isaacsim.sensors.camera",
         "--device_id", "0", "--policy_name", "RoboScopeKit", "--port", "1",
         "--protocol", "ws", "--policy_server_url", "ws://localhost:1",
         "--additional_info", "roboscope", "--seed", str(seed), "--host", "localhost", "--headless",

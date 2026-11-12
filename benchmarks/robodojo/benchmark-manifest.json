@@ -31,7 +31,6 @@
     "envs_per_worker": 1,
     "deferred_batch_planner": false,
     "compact_physx_buffers": false,
-    "compact_editor_viewport": false,
     "simulator_start_slots": 2,
     "simulator_start_free_gpu_mib": 0
   },

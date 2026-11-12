@@ -34,7 +34,6 @@ class RoboDojoRuntimeConfig:
     envs_per_worker: int = 1
     deferred_batch_planner: bool = False
     compact_physx_buffers: bool = False
-    compact_editor_viewport: bool = False
     simulator_start_slots: int = 2
     simulator_start_free_gpu_mib: int = 0
 
@@ -49,7 +48,7 @@ class RoboDojoRuntimeConfig:
             raise ValueError("RoboDojo shard size and CPU threads must be positive; seed must be nonnegative")
         if any(type(value) is not bool for value in (
             self.async_video, self.unpaced_render, self.control_state_reuse,
-            self.deferred_batch_planner, self.compact_physx_buffers, self.compact_editor_viewport,
+            self.deferred_batch_planner, self.compact_physx_buffers,
         )):
             raise ValueError("RoboDojo runtime switches must be booleans")
         for name in ("simulator_start_slots", "simulator_start_free_gpu_mib"):
@@ -129,7 +128,6 @@ class RoboDojoBenchmarkAdapter:
                 "--envs-per-worker", str(self.config.envs_per_worker),
                 *(("--deferred-batch-planner",) if self.config.deferred_batch_planner else ()),
                 *(("--compact-physx-buffers",) if self.config.compact_physx_buffers else ()),
-                *(("--compact-editor-viewport",) if self.config.compact_editor_viewport else ()),
                 "--simulator-start-slots", str(self.config.simulator_start_slots),
                 "--simulator-start-free-gpu-mib", str(self.config.simulator_start_free_gpu_mib),
             ),
@@ -179,7 +177,6 @@ class RoboDojoBenchmarkAdapter:
                 "envs_per_worker": self.config.envs_per_worker,
                 "deferred_batch_planner": self.config.deferred_batch_planner,
                 "compact_physx_buffers": self.config.compact_physx_buffers,
-                "compact_editor_viewport": self.config.compact_editor_viewport,
                 "simulator_start_slots": self.config.simulator_start_slots,
                 "simulator_start_free_gpu_mib": self.config.simulator_start_free_gpu_mib,
             },
