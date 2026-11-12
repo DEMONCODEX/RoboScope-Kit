@@ -111,8 +111,9 @@ class StartGate:
     """Let at most ``slots`` simulators of a run be starting at once; zero slots disables the gate.
 
     The Workers of a run share ``directory``. A slot is an exclusive lock on one of its files, so a Worker
-    that dies releases its slot. With ``free_gpu_mib``, a simulator also starts only when its GPU has that
-    much free memory for it and for every other simulator that is still starting.
+    that dies releases its slot. With ``free_gpu_mib``, a simulator is also launched only when its GPU has
+    that much free memory for it and for every simulator launched from another slot, whose memory is still
+    growing. The Workers decide this one at a time.
     """
 
     def __init__(self, directory: Path, slots: int, *, gpu_id: str = "0", free_gpu_mib: int = 0) -> None:
@@ -134,16 +135,16 @@ class StartGate:
             return None
         return descriptor
 
-    def _others_starting(self) -> int:
+    def _others_launched(self) -> int:
         count = 0
         for slot in range(self.slots):
             if slot == self._slot:
                 continue
             descriptor = self._try_lock(slot)
-            if descriptor is None:
-                count += 1
-            else:
+            if descriptor is not None:
                 os.close(descriptor)
+            elif (self.directory / f"slot-{slot}").read_bytes():
+                count += 1
         return count
 
     def acquire(self, log=None) -> None:
@@ -154,16 +155,20 @@ class StartGate:
             for slot in range(self.slots):
                 descriptor = self._try_lock(slot)
                 if descriptor is not None:
+                    os.ftruncate(descriptor, 0)
                     self._held, self._slot = descriptor, slot
                     break
             else:
                 time.sleep(START_POLL_S)
         next_log = time.monotonic()
         while self.free_gpu_mib:
-            free = gpu_free_mib(self.gpu_id)
-            needed = self.free_gpu_mib * (1 + self._others_starting())
-            if free is None or free >= needed:
-                return
+            with open(self.directory / "launch", "a") as deciding:
+                fcntl.flock(deciding, fcntl.LOCK_EX)
+                free = gpu_free_mib(self.gpu_id)
+                needed = self.free_gpu_mib * (1 + self._others_launched())
+                if free is None or free >= needed:
+                    os.pwrite(self._held, b"launched", 0)
+                    return
             if log is not None and time.monotonic() >= next_log:
                 next_log = time.monotonic() + START_MEMORY_LOG_S
                 print(f"[roboscope] waiting to start the simulator: GPU {self.gpu_id} has {free} MiB free, "
@@ -172,6 +177,7 @@ class StartGate:
 
     def release(self) -> None:
         if self._held is not None:
+            os.ftruncate(self._held, 0)
             os.close(self._held)
             self._held, self._slot = None, -1
 

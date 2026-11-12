@@ -275,7 +275,7 @@ def test_shard_stops_a_simulator_that_reports_a_vulkan_oom(
             time.sleep(0.05)
 
 
-def test_start_gate_holds_a_simulator_until_a_slot_is_free(
+def test_start_gate_holds_a_simulator_until_a_slot_and_gpu_memory_are_free(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     import threading
@@ -286,19 +286,35 @@ def test_start_gate_holds_a_simulator_until_a_slot_is_free(
     monkeypatch.setattr(worker, "START_MEMORY_POLL_S", 0.02)
     free = [100]
     monkeypatch.setattr(worker, "gpu_free_mib", lambda _gpu_id: free[0])
-    first = worker.StartGate(tmp_path, 1)
-    second = worker.StartGate(tmp_path, 1, free_gpu_mib=500)
+
+    # One slot: the second simulator waits for the slot, then for the memory it asks for.
+    first = worker.StartGate(tmp_path / "one", 1)
+    second = worker.StartGate(tmp_path / "one", 1, free_gpu_mib=500)
     first.acquire()
     waiting = threading.Thread(target=second.acquire)
     waiting.start()
-
     waiting.join(timeout=0.3)
     assert waiting.is_alive() and not second.held
     first.release()
     waiting.join(timeout=0.3)
-    # The slot is free, but the GPU has less memory than this simulator asks for.
     assert waiting.is_alive() and second.held
     free[0] = 500
     waiting.join(timeout=5)
     assert not waiting.is_alive()
     second.release()
+
+    # Two slots and memory for one: one simulator is launched, and the other waits for twice the memory
+    # while the first one's is still growing.
+    gates = [worker.StartGate(tmp_path / "two", 2, free_gpu_mib=500) for _ in range(2)]
+    threads = [threading.Thread(target=gate.acquire) for gate in gates]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=0.3)
+    assert sorted(thread.is_alive() for thread in threads) == [False, True]
+    free[0] = 1000
+    for thread in threads:
+        thread.join(timeout=5)
+    assert not any(thread.is_alive() for thread in threads)
+    for gate in gates:
+        gate.release()
