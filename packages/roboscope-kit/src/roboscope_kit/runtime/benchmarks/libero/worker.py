@@ -210,9 +210,9 @@ def run_episode(
         frames: list[np.ndarray] = []
         started = time.perf_counter()
 
-        # The settle steps are zero deltas. robosuite rebuilds the controller on every reset, so delta control is
-        # already on here and setting it is a guard. Absolute-target policies then get absolute control, as the
-        # X-VLA recipe does.
+        # The settle steps are zero deltas. robosuite rebuilds the controller on every reset, so delta
+        # control is already on here and setting it is a guard. Absolute-target policies then get absolute
+        # control, as the X-VLA recipe does.
         if absolute_actions:
             set_delta_control(runtime.env, True)
         for _ in range(settle_steps):
