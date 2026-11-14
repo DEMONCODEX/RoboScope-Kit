@@ -171,8 +171,10 @@ The Policy returns `ActionChunk` containing either:
 The seven values are the native LIBERO controller action: six end-effector values followed by the gripper
 command. Under the default `libero.delta-eef-v1` the six values are LIBERO's position and axis-angle deltas.
 A Policy that declares `libero.absolute-eef-v1` in `PolicyCapabilities.action_representations` returns the
-absolute target position and axis-angle orientation instead; after the settle steps of every episode the
-worker sets `use_delta = False` on each robot's OSC controller, as the X-VLA LIBERO client does. The worker
+absolute target instead: the end-effector position in the world frame and the axis-angle orientation of the
+controller's end-effector site (its `ee_ori_mat`). The observation's `robot0_eef_quat` is the body frame, so a
+Policy that sends it back as a target rotates the gripper. After the settle steps of every episode the worker
+sets `use_delta = False` on each robot's OSC controller, as the X-VLA LIBERO client does. The worker
 does not decode, clip, or normalize actions; the Policy must return a benchmark-valid native action. Actions from a chunk are executed in order, one simulator step at a time.
 A new observation is sent to the Policy only after the cached chunk is exhausted.
 

@@ -9,7 +9,7 @@ stateful Policy and multi-benchmark action contracts. The X-VLA entries on publi
 | Benchmark | X-VLA checkpoint used by the demo | Upstream paper/community metric (research reference) | Notes |
 |---|---|---|---|
 | calvin (task_ABC_D) | `X-VLA-Calvin-ABC_D` | avg_len **4.43** | Community metric available for comparison |
-| libero (4 suites) | `X-VLA-Libero` | 98.2/98.6/97.8/97.6, mean **98.1** | Community metric available for comparison |
+| libero (4 suites) | `X-VLA-Libero` | 98.2/98.6/97.8/97.6, mean **98.1** | Not directly comparable: measured with 800-step (900 on `libero_10`) episodes, the kit uses 220-520 |
 | libero_plus (4 suites) | `X-VLA-Libero` | No entry | Reported as is; no community reference |
 | robotwin (demo_clean/demo_randomized) | `X-VLA-RoboTwin2` | easy **70.0** / hard **39.0** | Directly comparable when the benchmark protocol matches |
 | robocasa (tabletop) | — | No entry | **N/A**: the public X-VLA assets cover only the other benchmarks in this table |
@@ -88,7 +88,9 @@ calvin and libero_plus work the same way (libero_plus uses `checkpoints/libero`)
   `robot0_eef_quat` is the body frame in xyzw, offset by a constant 90° z rotation, `_libero_site_rotmat`).
   The Policy declares `libero.absolute-eef-v1`, so the LIBERO worker switches the OSC controllers to absolute
   targets (`use_delta=False`) after the settle steps, as the recipe does. Episodes keep the benchmark's suite
-  horizons (220 to 520 policy steps), which are shorter than the recipe's 800 and 900 steps.
+  horizons (220 to 520 policy steps, the convention of OpenVLA's `run_libero_eval.py` that every Policy is
+  scored under), while X-VLA's client runs 800 steps (900 on `libero_10`), so its published LIBERO scores and
+  the kit's are not directly comparable.
 - **calvin**: matches calvin_client.py: absolute `(pos, quat_xyzw, grip)` tuples,
   the first 20 rows of the model chunk, domain_id=2, gripper threshold 0.8. The RoboScope Kit calvin spec is a 7-D
   relative action, so this Policy declares
