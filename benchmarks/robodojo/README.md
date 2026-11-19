@@ -142,6 +142,7 @@ number of Policy replicas. The sections below follow the order of this table.
 | PyRUA-Lean, GPT-6.1 Terra | K=G=4, shared SAM3, `cover_blocks` | no paired run | estimated 3.39× | 48 of 48 successes | [one table per Worker](#2026-11-10-pyrua-lean-with-one-table-per-worker) |
 | PyRUA-Lean, GPT-6.1 Terra | 2 processes × 24 tiled tables, `cover_blocks` | four single-table Workers | 2.05×, partial run | camera images differ from native | [one table per Worker](#2026-11-10-pyrua-lean-with-one-table-per-worker) |
 | PyRUA-Lean, scripted agent | K=G=7, start slots, compact GPU memory, all 54 tasks | K=G=1, unmodified runtime | 4.81× on `arx_x5`, 3.46× on `arx_x5_randomized` | 162 of 162 verdicts match; images differ no more than between two serial runs | [seven Workers on every task](#2026-11-12-pyrua-lean-with-seven-workers-on-every-task) |
+| PyRUA-Lean, GPT-6.1 Terra | K=G=7, start slots, compact GPU memory, all 42 `arx_x5` tasks | K=G=1, same runtime, 21 of the 42 tasks | estimated 4.8–5.1× | 27 and 29 of 63 successes on the paired tasks | [seven Workers with a real agent](#2026-11-14-pyrua-lean-with-seven-workers-and-a-real-agent) |
 | Latency Policy (synthetic) | K=G=5 | K=G=1 | 4.69× | not applicable: the Policy holds still | [latency-bound Policy](#2026-11-07-latency-bound-policy-synthetic) |
 
 ### 2026-11-07: `Simate_beta` with one environment per Worker
@@ -330,7 +331,7 @@ mean.
 On the same RTX 4090 (49,140 MiB), seven Workers evaluated every task of both suites, one table each, with the
 manifest defaults `deferred_batch_planner` and `compact_physx_buffers` on, `simulator_start_free_gpu_mib` 8000,
 the default two start slots and one shared SAM3 service. The runtime was built by `build-runtime.sh` from this
-branch at `COMMIT`. The serial runs used Kit `e4e5682` with its unmodified runtime and one Worker, in which one
+branch at `62a1aa1`. The serial runs used Kit `e4e5682` with its unmodified runtime and one Worker, in which one
 simulator plays a task's layouts in order.
 
 A scripted agent ran the same tool program on every task without model calls: read the state, locate three
@@ -381,6 +382,45 @@ than 0.05 mm apart for the same motion call.
 - **Limits:** a scripted agent without waiting time measures agreement, not an agent's throughput. On this card
   the seven heaviest `arx_x5` simulators together with SAM3 would need more memory than it has, which is what
   the free-memory requirement guards against.
+
+### 2026-11-14: PyRUA-Lean with seven Workers and a real agent
+
+On the same RTX 4090, PyRUA-Lean with GPT-6.1 Terra at `max` reasoning played layouts 0–2 of the 42 `arx_x5`
+tasks, 126 episodes, with seven Workers in the configuration of the previous section: the runtime built from
+`62a1aa1`, `deferred_batch_planner` and `compact_physx_buffers` on, `simulator_start_free_gpu_mib` 8000, two
+start slots and one shared SAM3 service. PyRUA ran with its default budgets of 100 tool calls and 5,400 s per
+episode. The serial baseline used the same runtime with the manifest defaults, one Worker and a local SAM3 in the
+Policy, in batches of seven tasks in alphabetical order; three of its six batches ran.
+
+| Run | Tasks | Episodes | Evaluation | Successes | Sum of episode times |
+|---|---:|---:|---:|---:|---:|
+| 7 Workers | 42 | 126 | 33,097.2 s | 62 | 193,167.5 s |
+| serial, batch 1 | 7 | 21 | 18,096.8 s | 15 | 17,478.9 s |
+| serial, batch 2 | 7 | 21 | 28,788.1 s | 10 | 28,090 s |
+| serial, batch 3 | 7 | 21 | 32,743.5 s (run time) | 4 | 32,088 s |
+
+On the 21 tasks of the three serial batches, episode by episode:
+
+| Batch | Serial successes | 7-Worker successes | Tasks with a different success count | Serial episode times | 7-Worker episode times |
+|---|---:|---:|---:|---:|---:|
+| 1: `align_blocks` to `deposit_coin` | 15/21 | 13/21 | 2, one episode each | 17,479 s | 19,039 s |
+| 2: `fasten_screws` to `imitate_sorting_sequence` | 10/21 | 10/21 | 0 | 28,090 s | 32,019 s |
+| 3: `insert_key` to `pack_objects_into_box` | 4/21 | 4/21 | 0 | 32,088 s | 40,949 s |
+| total | 29/63 | 27/63 | 2 | 77,657 s | 92,007 s |
+
+- **Throughput:** the three serial batches took 79,628 s for 21 tasks. Doubling that for all 42 tasks gives 4.8×
+  the serial rate. Scaling it by the 7-Worker episode time of the other 21 tasks, which are longer, gives 5.1×.
+- **Outcomes:** in batches 2 and 3 every task has the same success count in both runs. The two differences in
+  batch 1 are one episode each of `align_blocks` (2/3 serial, 1/3 with seven Workers) and
+  `arrange_largest_number` (3/3 and 2/3), within the variation between repeats of one configuration.
+- **Episode times:** an episode took 18% longer with seven Workers on these 21 tasks: 9% in batch 1, 14% in
+  batch 2 and 28% in batch 3, whose tasks are longer.
+- **Seven-Worker run:** no Worker failed and no simulator ran out of GPU memory; the GPU peaked at 45,531 MiB. Three episodes ended at the
+  tool-call budget and one at the time budget, each with the simulator's verdict. The last 2.3 hours ran fewer
+  than seven simulators: tasks are queued alphabetically, and the last two, `store_laptop_and_headphones` and
+  `sweep_blocks`, take about 2.7 hours each.
+- **Limits:** the serial baseline covers half of the tasks, so the throughput gain is an estimate. Each task has
+  three layouts, too few to show whether seven Workers change an agent's success rate.
 
 ### 2026-11-07: latency-bound Policy (synthetic)
 
