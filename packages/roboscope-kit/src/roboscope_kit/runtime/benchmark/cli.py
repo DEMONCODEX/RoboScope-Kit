@@ -290,6 +290,17 @@ def _run_evaluation(
     benchmark_spec = plan.benchmark_spec
     gpu_devices = plan.gpu_devices
     shard_kwargs = plan.shard_kwargs
+    if benchmark is BenchmarkName.MANISKILL and shard_kwargs:
+        from roboscope_kit.runtime.benchmarks.maniskill.shard_identity import shard_input_identity
+
+        with benchmark_phase(phase_timing_callback, "checkpoint_identity_s"):
+            shard_kwargs = {
+                **shard_kwargs,
+                "shard_build": {
+                    **shard_kwargs["shard_build"],
+                    **shard_input_identity(checkpoint, policy),
+                },
+            }
     fixed = args.concurrency is not None
     run_cache = _open_run_cache(args, benchmark, manifest, plan, checkpoint)
     cuda_mps: CudaMpsSession | None = None
