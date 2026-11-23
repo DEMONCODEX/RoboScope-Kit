@@ -352,9 +352,9 @@ not change `CUDA_VISIBLE_DEVICES`.
 With `"render_mode": "central"` in the RoboTwin manifest's `defaults`, RoboTwin evaluators simulate on the CPU
 and two render services per GPU (`render_services_per_gpu`) ray-trace their observations, instead of every
 evaluator holding its own renderer on the GPU. The saved GPU memory fits more Workers and replicas; on one
-RTX 4090 this mode evaluated 50 tasks × 2 episodes 46% faster than native K6/G2, and a prototype of it
-evaluated 50 tasks × 10 episodes 25% faster, with every episode's actions unchanged. It supports `demo_clean` with qpos actions and videos
-off. See [RoboTwin central rendering](https://github.com/MINT-SJTU/RoboScope-Kit/blob/main/benchmarks/robotwin/CENTRAL_RENDER.md).
+RTX 4090 with CUDA MPS, 500 `demo_clean` episodes ran 1.44× faster by evaluation time than native rendering
+with every outcome and terminal step unchanged. It supports `demo_clean` with qpos actions and videos off. See
+[RoboTwin central rendering](https://github.com/MINT-SJTU/RoboScope-Kit/blob/main/benchmarks/robotwin/CENTRAL_RENDER.md).
 
 ## Cross-instance sharding (Beta)
 
