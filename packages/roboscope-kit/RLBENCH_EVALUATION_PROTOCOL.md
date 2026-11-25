@@ -189,7 +189,8 @@ anyway, so rendering and point clouds are unchanged. Every observation carries, 
 | `language.instruction` | string | `get_task_descriptions()[0]` (section 5) |
 
 The shapes above are PerAct's 128x128. A Policy can negotiate another native render size per camera with
-`PolicyCapabilities.image_sizes` (32–1024 pixels per side, `(height, width)`). RLBench then sets that
+`PolicyCapabilities.image_sizes` (32–768 pixels per side, `(height, width)`; at 768 × 768 an observation of
+all four cameras stays inside the 64 MiB Policy message limit). RLBench then sets that
 camera's vision-sensor resolution, so its `images.<camera>`, `state.<camera>_depth` and
 `state.<camera>_point_cloud` have the negotiated height and width and its intrinsics are the ones RLBench
 computes for that resolution. The result records the sizes in `policy_io.image_sizes` and marks

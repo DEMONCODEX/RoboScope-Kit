@@ -1437,8 +1437,10 @@ def test_rlbench_depth_and_point_cloud_follow_the_negotiated_camera_size() -> No
     assert "spatial_features" not in camera_support_to_dict(
         benchmark_camera_support(roboscope_kit.get_benchmark_spec("libero", "libero_10"), {})
     )["images.primary"]
-    with pytest.raises(ValueError, match="heights 32-1024"):
+    with pytest.raises(ValueError, match="heights 32-768"):
         _negotiate_image_sizes("rlbench", "peract_18", [(16, 16)])
+    with pytest.raises(ValueError, match="heights 32-768"):
+        _negotiate_image_sizes("rlbench", "peract_18", [(1024, 1024)])
 
     from roboscope_kit.image_sizes import (
         BASELINE_IMAGE_SIZE_FEATURES,

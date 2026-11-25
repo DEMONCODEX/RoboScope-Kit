@@ -622,10 +622,11 @@ LIBERO_OSMESA_MAX_IMAGE_SIZE = (480, 640)
 METAWORLD_MIN_CAMERA_DIMENSION = 64
 METAWORLD_MAX_CAMERA_DIMENSION = 1024
 # RLBench renders each CoppeliaSim vision sensor natively at its configured resolution; its depth and
-# point cloud come from the same render. PerAct's protocol uses 128 x 128.
+# point cloud come from the same render. PerAct's protocol uses 128 x 128. At 768 x 768 an observation
+# of all four cameras (RGB, depth and point cloud) is about 60 MB, inside the 64 MiB Policy message limit.
 RLBENCH_CANONICAL_IMAGE_SIZE = (128, 128)
 RLBENCH_MIN_IMAGE_SIZE = (32, 32)
-RLBENCH_MAX_IMAGE_SIZE = (1024, 1024)
+RLBENCH_MAX_IMAGE_SIZE = (768, 768)
 
 
 # CALVIN's calvin_env cameras (conf/cameras/cameras/{static,gripper}.yaml) render natively at any
