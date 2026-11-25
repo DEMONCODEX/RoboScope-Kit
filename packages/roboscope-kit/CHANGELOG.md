@@ -13,6 +13,9 @@ Platform-only release notes from earlier versions are omitted; other changes rel
   dimensions follow its negotiated size; the Policy server checks them at that size. Such entries need
   the `spatial_features` image-size feature, so a Policy server from an older roboscope-kit is offered
   RLBench's 128 × 128 only.
+- A flat `image_sizes` list applies to every camera, so a Policy that already declares, for example,
+  `[(224, 224), ANY_SIZE]` now receives native 224 × 224 RLBench images, depth and point clouds with
+  `canonical_observations: false` instead of 128 × 128.
 
 ## 0.8.0b83 - 2026-11-26
 
