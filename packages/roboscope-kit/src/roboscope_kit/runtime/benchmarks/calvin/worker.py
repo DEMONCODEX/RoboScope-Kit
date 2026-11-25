@@ -20,8 +20,6 @@ from roboscope_kit.runtime.benchmark import EvaluationRecord, WorkerLoop, WorkIt
 
 CALVIN_RELATIVE_ACTION = "calvin.relative-v1"
 CALVIN_ABSOLUTE_ACTION = "calvin.absolute-compact-quat-v1"
-# Observation feature -> calvin_env camera group in the merged environment config.
-CALVIN_CAMERAS = (("images.static", "static"), ("images.gripper", "gripper"))
 
 
 def _absolute_action_tuple(action: np.ndarray) -> tuple[np.ndarray, np.ndarray, int]:

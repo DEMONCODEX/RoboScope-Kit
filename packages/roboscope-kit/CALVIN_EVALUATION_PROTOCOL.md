@@ -151,10 +151,11 @@ so the vertical field of view stays the upstream one; the images have the negoti
 shape, and `policy_io.canonical_observations` is `false`.
 
 A flat `image_sizes` list applies to every camera: a Policy that declares `[(224, 224), ANY_SIZE]`
-receives native 224 × 224 static and gripper frames. To keep a camera at its canonical size, name the
-features in a mapping or list the canonical size first. CALVIN's sizes need a Policy server that reports
-the `open_shape_ranges` image-size feature (roboscope-kit 0.8.0b83 or later in the Policy's own
-environment); a Policy on an older roboscope-kit is offered only the canonical sizes.
+receives native 224 × 224 static and gripper frames. The two cameras have different canonical sizes, so
+only a mapping that names the features keeps one camera at its canonical size while the other changes.
+CALVIN's sizes need a Policy server that reports the `open_shape_ranges` image-size feature
+(roboscope-kit 0.8.0b83 or later in the Policy's own environment); a Policy on an older roboscope-kit
+behaves exactly as with 0.8.0b81.
 
 The runtime does not resize, normalize, transpose, or otherwise adapt images for a particular model.
 Those transformations belong inside the user policy. `episode_id` identifies the sequence and subtask;

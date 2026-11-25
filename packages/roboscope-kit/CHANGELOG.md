@@ -9,7 +9,7 @@ Platform-only release notes from earlier versions are omitted; other changes rel
   the merged environment config. Without `image_sizes` CALVIN runs exactly as before.
 - Policy servers report the `open_shape_ranges` image-size feature: an image feature whose spec leaves its
   shape open takes the negotiated `(height, width)`. A Policy whose own environment runs an older
-  roboscope-kit is offered only CALVIN's canonical sizes, as before.
+  roboscope-kit behaves on CALVIN exactly as with 0.8.0b81.
 - A flat `image_sizes` list applies to every camera, so a Policy that already declares, for example,
   `[(224, 224), ANY_SIZE]` now receives native 224 × 224 CALVIN frames with
   `canonical_observations: false` instead of the canonical sizes.
