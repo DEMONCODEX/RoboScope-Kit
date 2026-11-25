@@ -270,7 +270,8 @@ environment); the ManiSkill cameras a suite's tasks use render any size from 16 
 while the Bridge camera keeps 480 x 640 (ManiSkill sizes need roboscope-kit 0.8.0b83 or later in the Policy
 environment); RoboCasa365 renders 64 to 640 pixels per side, one size shared by its three cameras (these
 sizes need roboscope-kit 0.8.0b87 or later in the Policy environment; older ones get 256 x 256 as before);
-RoboDojo's head and wrist cameras render any size from 64 to 2048 pixels per side (RoboDojo
+RoboDojo's head and wrist cameras render any size from 64 to 2048 pixels per side, keeping each camera's
+horizontal field of view (RoboDojo
 sizes need roboscope-kit 0.8.0b83 or later in the Policy environment); the other benchmarks render
 their own size only. Sizes that differ from the benchmark's own are recorded in
 `policy_io.image_sizes`, and `policy_io.canonical_observations` is then `false`, so such results are not

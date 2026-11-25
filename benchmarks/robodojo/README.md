@@ -26,14 +26,18 @@ order for absolute targets and gripper commands. The `robodojo.x5-ee-compact-qua
 y, z, qx, qy, qz, gripper]` for each arm; the missing quaternion `w` is reconstructed as nonnegative. The
 cameras render 480 × 640; a Policy can request any `(height, width)` from 64 to 2048 pixels per side for each
 camera with `PolicyCapabilities.image_sizes`. A camera with a negotiated size renders natively at that size
-with its own lens and pose, and is neither cropped nor resized; the build's `camera-sizes.patch` passes these
-sizes to RoboDojo's camera templates and pads odd sizes by one pixel in the saved videos only. Negotiated
-sizes need roboscope-kit 0.8.0b83 or later in the Policy environment. Runtimes built before this patch have no
-`negotiated_camera_sizes` in their installed manifest, so the Kit offers them 480 × 640 only; rebuild the
-runtime to use other sizes. Without `image_sizes` the cameras, observations and videos are unchanged. A Policy
-that needs every intermediate observation can declare `step_observation_updates=("robodojo",)` and implement
-`observe(Observation)`: `act()` receives the first observation of a chunk, and `observe()` receives the
-intermediate observations in step order.
+with its own lens and pose, and is neither cropped nor resized. The patch changes only the camera's
+`resolution`, so the horizontal field of view stays the camera's own and the vertical one follows the aspect
+ratio (RoboDojo derives its intrinsics the same way, `env/camera_manager/camera_manager.py:454-466` at
+f57e163): a size whose aspect ratio is not 4:3 shows more or less of the scene vertically, so the Gemini head
+camera at 224 × 224 sees about 96° vertically instead of about 80°, rather than a smaller copy of the 480 ×
+640 view; the build's `camera-sizes.patch` passes these sizes to RoboDojo's camera templates and pads odd
+sizes by one pixel in the saved videos only. Negotiated sizes need roboscope-kit 0.8.0b83 or later in the
+Policy environment. Runtimes built before this patch have no `negotiated_camera_sizes` in their installed
+manifest, so the Kit offers them 480 × 640 only; rebuild the runtime to use other sizes. Without `image_sizes`
+the cameras, observations and videos are unchanged. A Policy that needs every intermediate observation can
+declare `step_observation_updates=("robodojo",)` and implement `observe(Observation)`: `act()` receives the
+first observation of a chunk, and `observe()` receives the intermediate observations in step order.
 
 The manifest also exposes the experimental `async_video`, `unpaced_render`, and `control_state_reuse`
 switches, plus `physics_threads` (1, 4 or 8). They are disabled by default. `observation_queue_size` defaults
