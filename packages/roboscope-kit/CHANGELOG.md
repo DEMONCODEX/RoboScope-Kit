@@ -2,6 +2,18 @@
 
 Platform-only release notes from earlier versions are omitted; other changes relevant to the Kit are retained.
 
+## 0.8.0b87 - 2026-11-26
+
+- RoboCasa365 cameras render Policy-negotiated image sizes natively: 64–640 pixels per side through
+  `PolicyCapabilities.image_sizes`, one size shared by all three cameras because the official Gym wrapper
+  takes a single width and height. The simulator renders directly at that size and Kit never resamples.
+  At 640 × 640 an `act_batch` request (five slots, three cameras, two frames) is 47 MiB as JSON, within
+  the 64 MiB message limit. A negotiation that gives the cameras different sizes stops before any Worker
+  starts. Without `image_sizes` the environments are created exactly as before, at 256 × 256.
+- A flat `image_sizes` list applies to every camera, so a Policy that already declares, for example,
+  `[(224, 224), ANY_SIZE]` now receives native 224 × 224 RoboCasa365 images with
+  `canonical_observations: false` instead of 256 × 256.
+
 ## 0.8.0b86 - 2026-11-26
 
 - Render ManiSkill's field-of-view cameras at Policy-negotiated sizes, 16–512 pixels per side; the

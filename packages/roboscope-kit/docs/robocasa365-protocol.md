@@ -101,11 +101,20 @@ The robot is PandaOmron at 20 control steps/s. The official Gym wrapper renders
 three RGB cameras at 256 x 256, vertically flips each image exactly once, and
 supplies raw float32 state and episode language. No depth is requested.
 
+A Policy can negotiate another native render size with
+`PolicyCapabilities.image_sizes`: 64–640 pixels per side, one size for all
+three cameras, because the official Gym wrapper takes one width and one height.
+At 640 x 640 one `act_batch` request (five slots, three cameras, two frames)
+is 47 MiB as JSON, within the 64 MiB Policy message limit.
+The cameras then render directly at that size, the images have shape
+`(2,H,W,3)`, and `policy_io.canonical_observations` is `false`. A negotiation
+that gives the cameras different sizes stops before any Worker starts.
+
 | Kit feature | Upstream source | Shape / dtype |
 |---|---|---|
-| `images.agentview_left` | `video.robot0_agentview_left` | `(2,256,256,3)`, uint8 |
-| `images.agentview_right` | `video.robot0_agentview_right` | `(2,256,256,3)`, uint8 |
-| `images.wrist` | `video.robot0_eye_in_hand` | `(2,256,256,3)`, uint8 |
+| `images.agentview_left` | `video.robot0_agentview_left` | `(2,256,256,3)` or negotiated, uint8 |
+| `images.agentview_right` | `video.robot0_agentview_right` | `(2,256,256,3)` or negotiated, uint8 |
+| `images.wrist` | `video.robot0_eye_in_hand` | `(2,256,256,3)` or negotiated, uint8 |
 | `state.end_effector_position_relative` | same state suffix | `(2,3)`, float32 |
 | `state.end_effector_rotation_relative` | same state suffix, xyzw quaternion | `(2,4)`, float32 |
 | `state.gripper_qpos` | same state suffix | `(2,2)`, float32 |
