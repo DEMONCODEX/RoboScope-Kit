@@ -12,11 +12,13 @@ import threading
 import traceback
 import uuid
 from concurrent.futures import Future
+from dataclasses import replace
 from enum import Enum
 from pathlib import Path
 from queue import Empty, Queue
 from typing import Any
 
+from roboscope_kit.image_sizes import apply_image_sizes, camera_support_from_dict
 from roboscope_kit.policy import (
     ActionChunk,
     EpisodeContext,
@@ -24,6 +26,7 @@ from roboscope_kit.policy import (
     Policy,
     PolicyCapabilities,
     SessionContext,
+    negotiate_policy_action_contract,
     validate_action_chunk,
     validate_observation,
     validate_policy_capabilities,
@@ -236,10 +239,23 @@ class PolicyServer:
             self._require_state(operation, PolicyState.CREATED)
             self.state = PolicyState.LOADING
             context = SessionContext.from_dict(payload["context"])
+            camera_support = (
+                camera_support_from_dict(payload["camera_support"])
+                if payload.get("camera_support") is not None
+                else None
+            )
             capabilities = self.policy.load(context)
             if not isinstance(capabilities, PolicyCapabilities):
                 raise TypeError("Policy.load() must return PolicyCapabilities")
-            validate_policy_capabilities(context.benchmark, capabilities)
+            validate_policy_capabilities(context.benchmark, capabilities, camera_support=camera_support)
+            contract = negotiate_policy_action_contract(
+                context.benchmark,
+                capabilities,
+                eval_mode=context.eval_mode,
+                camera_support=camera_support,
+            )
+            # Observations are checked against the negotiated camera sizes.
+            context = replace(context, benchmark=apply_image_sizes(context.benchmark, contract.image_sizes))
             if capabilities.step_observation_updates and type(self.policy).observe is Policy.observe:
                 raise TypeError("Policy must implement observe() when it declares step observation updates")
             self.context = context

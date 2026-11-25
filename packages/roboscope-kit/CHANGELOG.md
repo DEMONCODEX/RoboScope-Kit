@@ -2,6 +2,19 @@
 
 Platform-only release notes from earlier versions are omitted; other changes relevant to the Kit are retained.
 
+## 0.8.0b77 - 2026-11-25
+
+- Negotiate camera image sizes between the benchmark and the Policy. `PolicyCapabilities.image_sizes`
+  lists accepted `(height, width)` sizes in order of preference, optionally ending with `ANY_SIZE`; the
+  runtime picks the first size the benchmark renders natively and never resamples. LIBERO and
+  LIBERO-Pro render 64–1024 pixels per side (480 × 640 at most with OSMesa); other benchmarks keep their
+  own size. Without `image_sizes` nothing changes.
+- Record the negotiated sizes and `canonical_observations` in `policy_io`; shard merging requires the
+  same `policy_io` on every shard and keeps it in the merged result.
+- Keep run-cache entries per negotiated image size (cache schema 2). Existing cache entries keep serving
+  runs at the benchmark's own size; the first run at a new size starts from them, and later runs at that
+  size use the selection and task times recorded for it.
+
 ## 0.8.0b76 - 2026-11-25
 
 - Build the CALVIN worker runtime with CPython 3.11.15 and hash-pinned dependencies.
