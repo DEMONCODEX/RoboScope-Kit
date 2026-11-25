@@ -9,7 +9,9 @@ Platform-only release notes from earlier versions are omitted; other changes rel
   ones RLBench computes for that resolution. PerAct's 128 × 128 stays the protocol size, and without
   `image_sizes` the worker builds its observation configuration exactly as before.
 - `CameraSupport.spatial_features` names the observation features rendered by a camera whose first two
-  dimensions follow its negotiated size; the Policy server checks them at that size.
+  dimensions follow its negotiated size; the Policy server checks them at that size. Such entries need
+  the `spatial_features` image-size feature, so a Policy server from an older roboscope-kit is offered
+  RLBench's 128 × 128 only.
 
 ## 0.8.0b83 - 2026-11-26
 
