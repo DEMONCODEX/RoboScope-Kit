@@ -1821,13 +1821,17 @@ def test_size_groups_share_one_size_range_and_accept_the_benchmark_size() -> Non
             ).image_sizes == {}
 
 
+ROBODOJO_PATCHED = {"negotiated_camera_sizes": True}
+
+
 def test_robodojo_cameras_negotiate_sizes_independently() -> None:
     from roboscope_kit.image_sizes import apply_image_sizes
 
-    assert _negotiate_image_sizes("robodojo", "arx_x5", None).image_sizes == {}
-    assert _negotiate_image_sizes("robodojo", "arx_x5", [(480, 640)]).image_sizes == {}
+    assert _negotiate_image_sizes("robodojo", "arx_x5", None, ROBODOJO_PATCHED).image_sizes == {}
+    assert _negotiate_image_sizes("robodojo", "arx_x5", [(480, 640)], ROBODOJO_PATCHED).image_sizes == {}
     contract = _negotiate_image_sizes(
-        "robodojo", "arx_x5", {"images.head": [(4096, 4096), (240, 424)], "images.left_wrist": [(224, 224)]}
+        "robodojo", "arx_x5", {"images.head": [(4096, 4096), (240, 424)], "images.left_wrist": [(224, 224)]},
+        ROBODOJO_PATCHED,
     )
     assert contract.image_sizes == {"images.head": (240, 424), "images.left_wrist": (224, 224)}
     spec = apply_image_sizes(roboscope_kit.get_benchmark_spec("robodojo", "arx_x5"), contract.image_sizes)
@@ -1837,7 +1841,7 @@ def test_robodojo_cameras_negotiate_sizes_independently() -> None:
         "images.right_wrist": None,
     }
     with pytest.raises(ValueError, match="heights 64-2048"):
-        _negotiate_image_sizes("robodojo", "arx_x5", [(32, 32)])
+        _negotiate_image_sizes("robodojo", "arx_x5", [(32, 32)], ROBODOJO_PATCHED)
     from roboscope_kit.benchmark_specs import benchmark_camera_support
     from roboscope_kit.image_sizes import (
         BASELINE_IMAGE_SIZE_FEATURES,
@@ -1846,11 +1850,30 @@ def test_robodojo_cameras_negotiate_sizes_independently() -> None:
     )
 
     robodojo = roboscope_kit.get_benchmark_spec("robodojo", "arx_x5")
-    full = benchmark_camera_support(robodojo, {})
+    full = benchmark_camera_support(robodojo, ROBODOJO_PATCHED)
     # A 0.8.0b77 Policy server cannot fix open shapes, so it is offered each camera's own size only.
     old = camera_support_for_server(robodojo, full, BASELINE_IMAGE_SIZE_FEATURES)
     assert all(support.min_size is None for support in old.values())
     assert camera_support_for_server(robodojo, full, frozenset(IMAGE_SIZE_FEATURES)) == full
+
+
+def test_robodojo_runtime_without_the_camera_patch_offers_its_own_size_only() -> None:
+    from roboscope_kit.benchmark_specs import benchmark_camera_support
+    from roboscope_kit.image_sizes import fixed_camera_support
+
+    manifest_path = Path(__file__).parents[3] / "benchmarks/robodojo/benchmark-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["defaults"]["negotiated_camera_sizes"] is True
+    robodojo = roboscope_kit.get_benchmark_spec("robodojo", "arx_x5")
+    # A runtime built before camera-sizes.patch has a manifest without the flag: the Kit offers the
+    # same table as before, so the Policy keeps 480 x 640 frames or the run stops before any Worker starts.
+    old_defaults = dict(manifest["defaults"])
+    del old_defaults["negotiated_camera_sizes"]
+    assert benchmark_camera_support(robodojo, old_defaults) == fixed_camera_support(robodojo)
+    kept = _negotiate_image_sizes("robodojo", "arx_x5", [(224, 224), roboscope_kit.ANY_SIZE], old_defaults)
+    assert kept.image_sizes == {}
+    with pytest.raises(ValueError, match="only its own"):
+        _negotiate_image_sizes("robodojo", "arx_x5", [(224, 224)], old_defaults)
 
 
 def test_robodojo_worker_renders_only_negotiated_cameras(tmp_path: Path) -> None:

@@ -9,6 +9,8 @@ Platform-only release notes from earlier versions are omitted; other changes rel
   renders at that size with its own lens and pose, without cropping or resampling. Without `image_sizes`
   every camera renders 480 × 640 exactly as before. RoboDojo sizes need roboscope-kit 0.8.0b83 or later in
   the Policy environment; older Policy servers are offered RoboDojo's own size only.
+- RoboDojo runtimes declare `negotiated_camera_sizes` in their manifest. A runtime built before this
+  release lacks it, and the Kit offers it 480 × 640 only, as before; rebuild it to use other sizes.
 - A flat `image_sizes` list applies to every camera, so a Policy that already declares, for example,
   `[(224, 224), ANY_SIZE]` now receives native 224 × 224 RoboDojo images with
   `canonical_observations: false`.

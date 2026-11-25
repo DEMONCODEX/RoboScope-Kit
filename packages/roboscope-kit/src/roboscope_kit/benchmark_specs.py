@@ -654,7 +654,8 @@ ROBOCASA365_MIN_IMAGE_SIZE = (64, 64)
 ROBOCASA365_MAX_IMAGE_SIZE = (640, 640)
 ROBOCASA365_IMAGE_FEATURES = ("images.agentview_left", "images.agentview_right", "images.wrist")
 # RoboDojo's Isaac Sim cameras render 480 x 640 in the official protocol and natively at any size
-# in these bounds; the head and both wrist cameras are negotiated independently.
+# in these bounds; the head and both wrist cameras are negotiated independently. Only runtimes built
+# with camera-sizes.patch can render them; their manifest declares `negotiated_camera_sizes: true`.
 ROBODOJO_CANONICAL_IMAGE_SIZE = (480, 640)
 ROBODOJO_MIN_IMAGE_SIZE = (64, 64)
 ROBODOJO_MAX_IMAGE_SIZE = (2048, 2048)
@@ -741,7 +742,8 @@ def benchmark_camera_support(
                 max_size=ROBOCASA365_MAX_IMAGE_SIZE,
                 size_group="robocasa365.cameras",
             )
-    elif benchmark.name == BenchmarkName.ROBODOJO.value:
+    elif (benchmark.name == BenchmarkName.ROBODOJO.value
+          and (defaults or {}).get("negotiated_camera_sizes") is True):
         for feature, _camera in ROBODOJO_CAMERAS:
             table[feature] = CameraSupport(
                 canonical=ROBODOJO_CANONICAL_IMAGE_SIZE,
