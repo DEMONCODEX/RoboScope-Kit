@@ -146,8 +146,12 @@ The SDK-native LIBERO worker renders both cameras at 256 × 256 by default and s
 features. A Policy can negotiate other native render sizes per camera with
 `PolicyCapabilities.image_sizes` (64–1024 pixels per side, at most 480 × 640 with `osmesa`); the
 images then have the negotiated `(height, width, 3)` shape, and `policy_io.canonical_observations` is
-`false`. LIBERO-Plus keeps 256 × 256 because its image corruptions assume square frames of at most 256
-pixels.
+`false`. LIBERO-Plus renders the same wrist sizes. Its agent view takes square sizes from 64 × 64 to
+256 × 256: its sensor-noise corruptions apply to the agent view only, the zoom blur rescales a square of the
+frame's height, and the fog adds a fixed 256 × 256 plasma map. The corruptions keep their pixel-based
+parameters (blur radii, glass-blur shuffle distance, fog map scale) at every size, so at other sizes their
+strength relative to the frame differs from the 256 × 256 protocol. A Policy server whose roboscope-kit does not report the
+`square_sizes` image-size feature (0.8.0b77) is offered the agent view at 256 × 256 only.
 
 | Feature | Type | Shape | Construction |
 | --- | --- | --- | --- |

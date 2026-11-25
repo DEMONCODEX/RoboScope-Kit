@@ -2,6 +2,14 @@
 
 Platform-only release notes from earlier versions are omitted; other changes relevant to the Kit are retained.
 
+## 0.8.0b85 - 2026-11-26
+
+- LIBERO-Plus renders its cameras at Policy-negotiated sizes: the wrist camera at 64–1024 pixels per side
+  (480 × 640 at most with OSMesa) and the agent view at square sizes from 64 × 64 to 256 × 256, the sizes
+  its image corruptions support. `CameraSupport.square` limits a camera to square sizes. Without
+  `image_sizes` nothing changes. A Policy server on an older roboscope-kit keeps the agent view at
+  256 × 256, since it does not report the `square_sizes` image-size feature.
+
 ## 0.8.0b84 - 2026-11-26
 
 - Render RLBench cameras at Policy-negotiated sizes. Each of the four cameras renders natively at 32–768
