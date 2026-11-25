@@ -12,6 +12,10 @@ Platform-only release notes from earlier versions are omitted; other changes rel
   suite that asks for another size on a Bridge profile stops before any Worker starts. Without
   `image_sizes` every camera keeps its task's own size and the Worker builds the environment exactly as
   before.
+- A flat `image_sizes` list applies to every camera, so a Policy that already declares, for example,
+  `[(224, 224), ANY_SIZE]` now receives native 224 × 224 ManiSkill images on suites without Bridge
+  tasks, with `canonical_observations: false`. ManiSkill's own size varies by task, so any negotiated
+  size counts as non-canonical, even one equal to a task's own size.
 
 ## 0.8.0b85 - 2026-11-26
 

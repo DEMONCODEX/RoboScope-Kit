@@ -99,7 +99,9 @@ upstream observation and map declared camera RGB pixels to `images.primary`, `im
 task's own size unless a Policy negotiates another size with `PolicyCapabilities.image_sizes` (16–512
 pixels per side). The Worker then sets that camera's `sensor_configs` width and height, so the
 field-of-view camera renders the negotiated size directly; Kit never resamples, and a depth or
-segmentation channel from the same camera has the same size. The Bridge camera keeps 480 × 640: it is
+segmentation channel from the same camera has the same size. One suite can mix tasks whose own sizes
+differ, so the protocol fixes no camera size: any negotiated size, even one equal to a task's own size,
+marks the run `canonical_observations: false`. The Bridge camera keeps 480 × 640: it is
 defined by a pixel intrinsic for that size and composited over a real photo, so another size would
 show a cropped view. Suites with Bridge tasks (`bridge_rgb_v1`, `upstream_tasks_v1`) therefore keep
 every camera at its own size, and a custom suite that asks for another size on a Bridge profile stops
