@@ -291,6 +291,7 @@ class RLBenchBenchmarkAdapter:
             "episodes": list(range(self.config.episodes_per_task)),
             "episode_length": EPISODE_LENGTH,
             "cameras": list(CAMERAS),
+            # The protocol's camera size; negotiated sizes are recorded in policy_io.image_sizes.
             "image_size": list(IMAGE_SIZE),
             "action_representation": ACTION_REPRESENTATION,
             "success_criterion": SUCCESS_CRITERION,
