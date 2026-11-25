@@ -6,8 +6,9 @@ Platform-only release notes from earlier versions are omitted; other changes rel
 
 - The Policy server reports which image-size features it understands (`image_size_features` in its
   `health` reply), and the Kit offers a Policy only the camera sizes its roboscope-kit version can
-  apply. A Policy environment on an older roboscope-kit keeps exactly the behavior of that version when
-  later benchmarks open more camera sizes.
+  apply, so the Kit and a Policy environment on an older roboscope-kit always agree on observation
+  shapes. A camera whose sizes that version cannot apply keeps the benchmark's own size; a camera whose
+  sizes it can apply follows the Policy's `image_sizes`.
 
 ## 0.8.0b81 - 2026-11-26
 
