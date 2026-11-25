@@ -110,7 +110,9 @@ class CameraSupport:
     observation features rendered by this camera, such as depth or a point cloud, whose first two
     dimensions are the camera's (height, width) and follow its negotiated size. ``square``
     limits the camera to sizes whose height equals their width. Cameras with the same
-    ``size_group`` render one size, which the negotiation picks for all of them together.
+    ``size_group`` render one size, which the negotiation picks for all of them together; they must
+    have equal ``canonical``, ``min_size``, ``max_size`` and ``square``, with the canonical size inside
+    the range, so that a Policy without ``image_sizes`` or with ``[ANY_SIZE]`` always negotiates.
     """
 
     canonical: ImageSize | None

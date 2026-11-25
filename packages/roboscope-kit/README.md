@@ -254,6 +254,9 @@ PolicyCapabilities(..., image_sizes=[(224, 224), ANY_SIZE])  # prefer 224 x 224
 PolicyCapabilities(..., image_sizes={"images.wrist": [(128, 160), ANY_SIZE]})  # one camera
 ```
 
+Cameras that share one size, such as RoboCasa365's three, take the first size all of them accept, so a
+mapping should name every camera of the group.
+
 Without `image_sizes` every camera keeps the benchmark's size, as before. When no listed size can be
 rendered, the run stops before any Worker starts and names what each side supports. LIBERO and LIBERO-Pro
 render any size from 64 to 1024 pixels per side (up to 480 x 640 with `render_backend: osmesa`), and so
