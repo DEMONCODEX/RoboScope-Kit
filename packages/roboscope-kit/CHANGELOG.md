@@ -2,6 +2,13 @@
 
 Platform-only release notes from earlier versions are omitted; other changes relevant to the Kit are retained.
 
+## 0.8.0b86 - 2026-11-26
+
+- Render ManiSkill cameras at Policy-negotiated sizes. ManiSkill declares 16–512 pixels per side for
+  `images.primary`, `images.wrist` and `images.auxiliary`; the Worker sets each negotiated camera's
+  `sensor_configs` width and height, so the simulator renders that size directly. Without `image_sizes`
+  every camera keeps its task's own size and the Worker builds the environment exactly as before.
+
 ## 0.8.0b85 - 2026-11-26
 
 - LIBERO-Plus renders its cameras at Policy-negotiated sizes: the wrist camera at 64–1024 pixels per side

@@ -484,3 +484,92 @@ def test_probe_health_counts_a_recycling_worker_as_live(tmp_path: Path) -> None:
     assert health["initial_workers"] == 3
     assert health["final_workers"] == 2
     assert health["expected_episodes"] == 12
+
+
+# ---- negotiated camera image sizes -----------------------------------------------------------
+
+
+def _camera_profile(**changes: Any) -> dict[str, Any]:
+    profile = {
+        "profile_id": "pick_rgb", "task_id": "PickCube-v1",
+        "cameras": {"images.primary": "base_camera", "images.wrist": "hand_camera"},
+        "sensor_configs": {},
+    }
+    profile.update(changes)
+    return profile
+
+
+def test_maniskill_cameras_negotiate_any_native_size() -> None:
+    import roboscope_kit
+    from roboscope_kit.benchmark_specs import benchmark_camera_support, get_benchmark_spec
+    from roboscope_kit.policy import PolicyCapabilities
+
+    spec = get_benchmark_spec("maniskill", "tabletop_rgb_v1")
+    support = benchmark_camera_support(spec, {})
+
+    def negotiate(image_sizes):
+        return roboscope_kit.negotiate_policy_action_contract(spec, PolicyCapabilities(
+            supported_benchmarks=("maniskill",), required_features=(), image_sizes=image_sizes,
+        ), camera_support=support).image_sizes
+
+    assert negotiate(None) == {} and negotiate([roboscope_kit.ANY_SIZE]) == {}
+    assert negotiate({"images.primary": [(96, 160)]}) == {"images.primary": (96, 160)}
+    assert negotiate([(1024, 1024), (224, 224)])["images.auxiliary"] == (224, 224)
+    with pytest.raises(ValueError, match="heights 16-512"):
+        negotiate([(8, 8)])
+    with pytest.raises(ValueError, match="widths 16-512"):
+        negotiate([(512, 640)])
+
+    from roboscope_kit.image_sizes import (
+        BASELINE_IMAGE_SIZE_FEATURES,
+        IMAGE_SIZE_FEATURES,
+        CameraSupport,
+        camera_support_for_server,
+    )
+
+    # A Policy server on an SDK without open-shape ranges keeps every camera at the task's own size.
+    old_server = camera_support_for_server(spec, support, BASELINE_IMAGE_SIZE_FEATURES)
+    assert set(old_server.values()) == {CameraSupport(canonical=None)}
+    assert camera_support_for_server(spec, support, frozenset(IMAGE_SIZE_FEATURES)) == support
+
+
+def test_maniskill_worker_command_carries_only_negotiated_sizes(tmp_path: Path) -> None:
+    from roboscope_kit.policy import PolicyExecutionContract
+    from roboscope_kit.runtime.benchmark.adapters import WorkerContext
+
+    def command(image_sizes):
+        return _adapter().worker_process(WorkerContext(
+            worker_id=0, gpu_slot=0, replica_id=0, gpu_device="0", replica_port=0,
+            replica_socket=tmp_path / "replica.sock", queue_dir=tmp_path / "queue",
+            state_dir=tmp_path / "state", output_dir=tmp_path,
+            execution_contract=PolicyExecutionContract(
+                benchmark="maniskill", action_representation="maniskill.native-controller-v1",
+                image_sizes=image_sizes,
+            ),
+        )).command
+
+    assert "--image-size" not in command({})
+    sized = command({"images.wrist": (96, 160), "images.primary": (224, 224)})
+    assert sized[len(command({})):] == (
+        "--image-size", "images.primary=224x224", "--image-size", "images.wrist=96x160",
+    )
+
+
+def test_maniskill_negotiated_sizes_set_only_their_cameras() -> None:
+    from roboscope_kit.runtime.benchmarks.maniskill.worker import parse_image_size, with_image_sizes
+
+    profile = _camera_profile(sensor_configs={"shader_pack": "default", "base_camera": {"fov": 1.0}})
+    assert with_image_sizes(profile, {}) is profile
+    state_profile = _camera_profile(cameras={})
+    assert with_image_sizes(state_profile, {"images.primary": (96, 160)}) is state_profile
+    sized = with_image_sizes(profile, dict([parse_image_size("images.primary=96x160")]))
+    assert sized["sensor_configs"] == {
+        "shader_pack": "default", "base_camera": {"fov": 1.0, "height": 96, "width": 160},
+    }
+    assert profile["sensor_configs"] == {"shader_pack": "default", "base_camera": {"fov": 1.0}}
+    shared = _camera_profile(cameras={"images.primary": "base_camera", "images.wrist": "base_camera"})
+    with pytest.raises(ValueError, match="several image features"):
+        with_image_sizes(shared, {"images.primary": (96, 96), "images.wrist": (128, 128)})
+    for value in ("images.primary", "images.primary=96", "=96x96", "images.primary=0x96"):
+        with pytest.raises(Exception, match="FEATURE=HEIGHTxWIDTH"):
+            parse_image_size(value)

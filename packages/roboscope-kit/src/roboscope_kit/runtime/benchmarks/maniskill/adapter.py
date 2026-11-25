@@ -60,16 +60,19 @@ class ManiSkillBenchmarkAdapter:
 
     def worker_process(self, context: WorkerContext) -> ProcessSpec:
         threads = str(self.config.cpu_threads)
+        command = (
+            str(self.config.python), "-m", "roboscope_kit.runtime.benchmarks.maniskill.worker",
+            "--benchmark-manifest", str(self.config.manifest_path), "--suite", self.config.suite,
+            "--worker-id", str(context.worker_id),
+            "--policy-socket", str(context.replica_socket),
+            "--queue-dir", str(context.queue_dir),
+            "--worker-state-dir", str(context.state_dir),
+            "--policy-batch-size", str(self.config.policy_batch_size),
+        )
+        for feature, (height, width) in sorted(context.execution_contract.image_sizes.items()):
+            command += ("--image-size", f"{feature}={height}x{width}")
         return ProcessSpec(
-            command=(
-                str(self.config.python), "-m", "roboscope_kit.runtime.benchmarks.maniskill.worker",
-                "--benchmark-manifest", str(self.config.manifest_path), "--suite", self.config.suite,
-                "--worker-id", str(context.worker_id),
-                "--policy-socket", str(context.replica_socket),
-                "--queue-dir", str(context.queue_dir),
-                "--worker-state-dir", str(context.state_dir),
-                "--policy-batch-size", str(self.config.policy_batch_size),
-            ),
+            command=command,
             env={
                 "CUDA_VISIBLE_DEVICES": context.gpu_device,
                 "HOME": str(self.config.runtime_home),

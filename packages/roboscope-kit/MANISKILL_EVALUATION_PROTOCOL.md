@@ -95,7 +95,11 @@ forwarded to the native controller. Multi-agent Dict action spaces use the pinne
 `state.proprioception` preserves the upstream flattened state order. A `state_dict` profile uses
 upstream insertion-order flattening. Visual profiles expose the state already present in that
 upstream observation and map declared camera RGB pixels to `images.primary`, `images.wrist` or
-`images.auxiliary`. Native image shape and uint8 pixels are retained. The optional
+`images.auxiliary`. Native image shape and uint8 pixels are retained: each camera renders at its
+task's own size unless a Policy negotiates another size with `PolicyCapabilities.image_sizes` (16–512
+pixels per side). The Worker then sets that camera's `sensor_configs` width and height, so the
+simulator renders the negotiated size directly; Kit never resamples, and a depth or segmentation
+channel from the same camera has the same size. The optional
 `language.instruction` comes from the profile. Model-specific normalization and preprocessing
 belong to the Policy implementation. The optional `include_joint_names` profile setting adds
 actual active/controller joint identities to episode metadata without adding observation features.
