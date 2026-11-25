@@ -2,6 +2,24 @@
 
 Platform-only release notes from earlier versions are omitted; other changes relevant to the Kit are retained.
 
+## 0.8.0b89 - 2026-11-26
+
+- RoboTwin cameras render Policy-negotiated image sizes natively. The head and both wrist cameras accept
+  64–1024 pixels per side through `PolicyCapabilities.image_sizes`; a camera with a negotiated size is
+  created at that width and height with the field of view, pose and random draws of its task config, so
+  the `task_config` files and the frozen seed protocol are unchanged. The vertical field of view stays,
+  so the horizontal view follows the aspect ratio: 224 × 224 shows about 23% less at the sides than
+  240 × 320. Without `image_sizes` the simulator is set up exactly as before.
+- RoboTwin offers these sizes only with native rendering on a runtime whose manifest sets
+  `negotiated_camera_sizes` (built by this release's `build-runtime.sh`). `render_mode: central`, and a
+  runtime built before this release until it is rebuilt, keep 240 × 320.
+- A flat `image_sizes` list applies to every camera, so a Policy that already declares, for example,
+  `[(224, 224), ANY_SIZE]` now receives native 224 × 224 RoboTwin images with
+  `canonical_observations: false`.
+- RoboTwin's camera specs leave the image shape open, so other RoboTwin sizes need roboscope-kit 0.8.0b83
+  or later in the Policy environment, the first version whose server reports `open_shape_ranges`; a
+  Policy server on an earlier version keeps 240 × 320.
+
 ## 0.8.0b88 - 2026-11-26
 
 - RoboDojo cameras render Policy-negotiated image sizes natively. The head and both wrist cameras each
