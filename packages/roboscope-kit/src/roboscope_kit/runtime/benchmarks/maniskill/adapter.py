@@ -76,7 +76,8 @@ class ManiSkillBenchmarkAdapter:
                 raise ValueError(
                     f"ManiSkill {profile['profile_id']} renders {', '.join(fixed)} only at the task's own "
                     "size: its camera uses a fixed pixel intrinsic over a real-image background. "
-                    "Evaluate it without image_sizes or with ANY_SIZE."
+                    "Request [ANY_SIZE], leave that feature out of an image_sizes mapping, or put the "
+                    "Bridge tasks in a suite of their own."
                 )
         for feature, (height, width) in sorted(image_sizes.items()):
             command += ("--image-size", f"{feature}={height}x{width}")

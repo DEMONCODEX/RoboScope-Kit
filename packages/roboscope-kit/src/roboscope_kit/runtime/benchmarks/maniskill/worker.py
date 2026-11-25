@@ -28,7 +28,13 @@ from roboscope_kit.benchmark_specs import BenchmarkName
 from roboscope_kit.runtime.benchmark import EvaluationRecord, WorkerLoop, WorkItem, WorkResult
 from roboscope_kit.runtime.benchmark.manifest import load_benchmark_manifest
 
-from .profile import PROTOCOL_ID, physx_library_sha256, self_test_profiles, validate_profiles
+from .profile import (
+    PROTOCOL_ID,
+    fixed_size_cameras,
+    physx_library_sha256,
+    self_test_profiles,
+    validate_profiles,
+)
 
 # Raw states sample the first two, midpoint and final episodes of the 100-episode
 # reference. Every episode still retains complete initial-state/observation hashes.
@@ -62,10 +68,15 @@ def with_image_sizes(
     task default and any profile-wide size. Without negotiated sizes the profile is returned as is.
     """
     sizes: dict[str, tuple[int, int]] = {}
+    fixed = fixed_size_cameras(profile) if image_sizes else {}
     for feature, size in image_sizes.items():
         camera = profile.get("cameras", {}).get(feature)
         if camera is None:
             continue
+        if feature in fixed:
+            raise ValueError(
+                f"ManiSkill {profile['profile_id']} camera {camera!r} renders only the task's own size"
+            )
         if sizes.setdefault(camera, size) != size:
             raise ValueError(
                 f"ManiSkill {profile['profile_id']} camera {camera!r} serves several image features "

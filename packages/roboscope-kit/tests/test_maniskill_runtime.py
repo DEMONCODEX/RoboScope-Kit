@@ -636,3 +636,10 @@ def test_maniskill_bridge_cameras_keep_their_own_size(tmp_path: Path) -> None:
     assert "--image-size" not in command({})
     with pytest.raises(ValueError, match="carrot renders images.primary only at the task's own size"):
         command({"images.primary": (224, 224)})
+
+    from roboscope_kit.runtime.benchmarks.maniskill.worker import with_image_sizes
+
+    carrot = next(p for p in adapter.config.profiles if p["profile_id"] == "carrot")
+    assert with_image_sizes(carrot, {}) is carrot
+    with pytest.raises(ValueError, match="renders only the task's own size"):
+        with_image_sizes(carrot, {"images.primary": (224, 224)})
