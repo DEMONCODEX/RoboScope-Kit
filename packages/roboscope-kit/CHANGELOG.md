@@ -2,6 +2,17 @@
 
 Platform-only release notes from earlier versions are omitted; other changes relevant to the Kit are retained.
 
+## 0.8.0b89 - 2026-11-26
+
+- RoboDojo cameras render Policy-negotiated image sizes natively. The head and both wrist cameras each
+  accept 64–2048 pixels per side through `PolicyCapabilities.image_sizes`; a camera with a negotiated size
+  renders at that size with its own lens and pose, without cropping or resampling. Without `image_sizes`
+  every camera renders 480 × 640 exactly as before. RoboDojo sizes need roboscope-kit 0.8.0b83 or later in
+  the Policy environment; older Policy servers are offered RoboDojo's own size only.
+- A flat `image_sizes` list applies to every camera, so a Policy that already declares, for example,
+  `[(224, 224), ANY_SIZE]` now receives native 224 × 224 RoboDojo images with
+  `canonical_observations: false`.
+
 ## 0.8.0b87 - 2026-11-26
 
 - RoboCasa365 cameras render Policy-negotiated image sizes natively: 64–640 pixels per side through

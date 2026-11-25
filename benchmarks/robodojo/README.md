@@ -20,13 +20,18 @@ shards. A shard missing a layout or returning incomplete results fails rather th
 
 The Policy receives `images.head`, `images.left_wrist`, and `images.right_wrist` as RGB uint8 arrays,
 `language.instruction` as a string, and `state.joints` as 14 float32 values ordered as six left-arm joints,
-left gripper, six right-arm joints, right gripper. `state.ee_pose` contains both end-effector poses as
-`[x, y, z, qw, qx, qy, qz]` in the environment frame. The default `robodojo.x5-joint-v1` action uses the
-joint-state order for absolute targets and gripper commands. The `robodojo.x5-ee-compact-quat-v1` action
-instead has `[x, y, z, qx, qy, qz, gripper]` for each arm; the missing quaternion `w` is reconstructed as
-nonnegative. A Policy that needs every intermediate observation can declare
-`step_observation_updates=("robodojo",)` and implement `observe(Observation)`: `act()` receives the
-first observation of a chunk, and `observe()` receives the intermediate observations in step order.
+left gripper, six right-arm joints, right gripper. `state.ee_pose` contains both end-effector poses as `[x, y,
+z, qw, qx, qy, qz]` in the environment frame. The default `robodojo.x5-joint-v1` action uses the joint-state
+order for absolute targets and gripper commands. The `robodojo.x5-ee-compact-quat-v1` action instead has `[x,
+y, z, qx, qy, qz, gripper]` for each arm; the missing quaternion `w` is reconstructed as nonnegative. The
+cameras render 480 × 640; a Policy can request any `(height, width)` from 64 to 2048 pixels per side for each
+camera with `PolicyCapabilities.image_sizes`. A camera with a negotiated size renders natively at that size
+with its own lens and pose, and is neither cropped nor resized; the build's `camera-sizes.patch` passes these
+sizes to RoboDojo's camera templates and pads odd sizes by one pixel in the saved videos only. Negotiated
+sizes need roboscope-kit 0.8.0b83 or later in the Policy environment. Without `image_sizes` the cameras,
+observations and videos are unchanged. A Policy that needs every intermediate observation can declare
+`step_observation_updates=("robodojo",)` and implement `observe(Observation)`: `act()` receives the first
+observation of a chunk, and `observe()` receives the intermediate observations in step order.
 
 The manifest also exposes the experimental `async_video`, `unpaced_render`, and `control_state_reuse`
 switches, plus `physics_threads` (1, 4 or 8). They are disabled by default. `observation_queue_size` defaults
