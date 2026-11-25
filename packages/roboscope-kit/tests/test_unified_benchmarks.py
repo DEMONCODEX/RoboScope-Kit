@@ -1440,6 +1440,27 @@ def test_rlbench_depth_and_point_cloud_follow_the_negotiated_camera_size() -> No
     with pytest.raises(ValueError, match="heights 32-1024"):
         _negotiate_image_sizes("rlbench", "peract_18", [(16, 16)])
 
+    from roboscope_kit.image_sizes import (
+        BASELINE_IMAGE_SIZE_FEATURES,
+        IMAGE_SIZE_FEATURES,
+        camera_support_for_server,
+        camera_support_requirements,
+        fixed_camera_support,
+    )
+
+    full = benchmark_camera_support(spec, {})
+    front = next(feature for feature in spec.features if feature.name == "images.front")
+    needed = camera_support_requirements(front, full["images.front"])
+    assert needed == {"fixed_shape_ranges", "spatial_features"}
+    assert "spatial_features" in IMAGE_SIZE_FEATURES
+    assert camera_support_for_server(spec, full, frozenset(IMAGE_SIZE_FEATURES)) == full
+    # A Policy server that cannot resize depth and point clouds (0.8.0b77) is offered PerAct's size only.
+    baseline = camera_support_for_server(spec, full, BASELINE_IMAGE_SIZE_FEATURES)
+    assert baseline == fixed_camera_support(spec)
+    capabilities = _image_size_capabilities("rlbench", [(96, 160), roboscope_kit.ANY_SIZE])
+    contract = roboscope_kit.negotiate_policy_action_contract(spec, capabilities, camera_support=baseline)
+    assert contract.image_sizes == {}
+
 
 def test_rlbench_worker_command_carries_only_negotiated_sizes(tmp_path: Path) -> None:
     from roboscope_kit.policy import PolicyExecutionContract

@@ -24,7 +24,9 @@ ANY_SIZE = "any"
 # server would misread, and teach ``camera_support_requirements`` about it.
 # ``open_shape_ranges``: size ranges for features whose spec leaves the shape open; the negotiated
 # feature takes the shape ``(height, width, None)`` (CALVIN).
-IMAGE_SIZE_FEATURES: tuple[str, ...] = ("fixed_shape_ranges", "open_shape_ranges")
+# ``spatial_features``: a camera's other features (depth, point cloud) take its negotiated size
+# (``CameraSupport.spatial_features``, RLBench).
+IMAGE_SIZE_FEATURES: tuple[str, ...] = ("fixed_shape_ranges", "open_shape_ranges", "spatial_features")
 BASELINE_IMAGE_SIZE_FEATURES = frozenset({"fixed_shape_ranges"})
 
 ImageSize = tuple[int, int]
@@ -207,10 +209,11 @@ def camera_support_requirements(feature: FeatureSpec, support: CameraSupport) ->
 
     if support.min_size is None or support.max_size is None:
         return frozenset()
-    if spatial_size(feature) is not None:
-        return frozenset({"fixed_shape_ranges"})
-    # A size range for a feature whose spec leaves its shape open.
-    return frozenset({"open_shape_ranges"})
+    # A size range for a feature whose spec fixes its shape, or leaves it open.
+    needed = {"fixed_shape_ranges" if spatial_size(feature) is not None else "open_shape_ranges"}
+    if support.spatial_features:
+        needed.add("spatial_features")
+    return frozenset(needed)
 
 
 def camera_support_for_server(
