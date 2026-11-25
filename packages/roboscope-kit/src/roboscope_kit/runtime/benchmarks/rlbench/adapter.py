@@ -132,6 +132,11 @@ class RLBenchBenchmarkAdapter:
             "--xvfb",
             str(self.config.xvfb),
         )
+        image_sizes = context.execution_contract.image_sizes
+        for camera in CAMERAS:
+            if f"images.{camera}" in image_sizes:
+                height, width = image_sizes[f"images.{camera}"]
+                command += ("--camera-size", f"{camera}={height}x{width}")
         return ProcessSpec(
             command=command,
             env={
