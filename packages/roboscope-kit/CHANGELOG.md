@@ -2,6 +2,13 @@
 
 Platform-only release notes from earlier versions are omitted; other changes relevant to the Kit are retained.
 
+## 0.8.0b82 - 2026-11-26
+
+- The Policy server reports which image-size features it understands (`image_size_features` in its
+  `health` reply), and the Kit offers a Policy only the camera sizes its roboscope-kit version can
+  apply. A Policy environment on an older roboscope-kit keeps exactly the behavior of that version when
+  later benchmarks open more camera sizes.
+
 ## 0.8.0b81 - 2026-11-26
 
 - MetaWorld cameras render Policy-negotiated image sizes natively. Every configured camera accepts 64–1024

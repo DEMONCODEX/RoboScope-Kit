@@ -15,7 +15,11 @@ from typing import Any
 from roboscope_kit.benchmark_specs import BenchmarkName
 from roboscope_kit.client import PolicyClient
 from roboscope_kit.contracts import BenchmarkSpec
-from roboscope_kit.image_sizes import CameraSupport
+from roboscope_kit.image_sizes import (
+    BASELINE_IMAGE_SIZE_FEATURES,
+    CameraSupport,
+    camera_support_for_server,
+)
 from roboscope_kit.policy import (
     DEFAULT_EVAL_MODE,
     PolicyCapabilities,
@@ -122,12 +126,22 @@ class PolicyProcessAdapter:
             eval_mode=self.eval_mode,
         )
         with PolicyClient(context.socket_path, timeout_s=self.load_timeout_s) as client:
-            capabilities = client.load(session, camera_support=self.camera_support)
+            camera_support = self.camera_support
+            if camera_support is not None:
+                # Offer only the camera sizes this Policy's roboscope-kit version can apply.
+                reported = client.health().get("image_size_features")
+                server_features = (
+                    frozenset(item for item in reported if isinstance(item, str))
+                    if isinstance(reported, list)
+                    else BASELINE_IMAGE_SIZE_FEATURES
+                )
+                camera_support = camera_support_for_server(session.benchmark, camera_support, server_features)
+            capabilities = client.load(session, camera_support=camera_support)
         contract = negotiate_policy_action_contract(
             session.benchmark,
             capabilities,
             eval_mode=self.eval_mode,
-            camera_support=self.camera_support,
+            camera_support=camera_support,
         )
         # Replicas on different GPUs initialize concurrently.
         with self._replica_lock:

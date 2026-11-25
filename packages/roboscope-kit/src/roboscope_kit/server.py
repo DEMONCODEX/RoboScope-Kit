@@ -18,7 +18,7 @@ from pathlib import Path
 from queue import Empty, Queue
 from typing import Any
 
-from roboscope_kit.image_sizes import apply_image_sizes, camera_support_from_dict
+from roboscope_kit.image_sizes import IMAGE_SIZE_FEATURES, apply_image_sizes, camera_support_from_dict
 from roboscope_kit.policy import (
     ActionChunk,
     EpisodeContext,
@@ -233,8 +233,12 @@ class PolicyServer:
         if operation == "health":
             # A client offering encodings learns which ones this server can receive.
             if "encodings" in payload:
-                return {"state": self.state.value, "encodings": list(ENCODINGS)}
-            return {"state": self.state.value}
+                return {
+                    "state": self.state.value,
+                    "encodings": list(ENCODINGS),
+                    "image_size_features": list(IMAGE_SIZE_FEATURES),
+                }
+            return {"state": self.state.value, "image_size_features": list(IMAGE_SIZE_FEATURES)}
         if operation == "load":
             self._require_state(operation, PolicyState.CREATED)
             self.state = PolicyState.LOADING

@@ -18,6 +18,13 @@ from roboscope_kit.contracts import BenchmarkSpec, FeatureKind, FeatureSpec
 
 ANY_SIZE = "any"
 
+# Image-size features a Policy server understands, reported in its ``health`` reply. A server that
+# reports none (roboscope-kit 0.8.0b77) understands ``fixed_shape_ranges``: size ranges for features
+# whose spec fixes a spatial shape. Add a name here whenever camera support gains a meaning an older
+# server would misread, and teach ``camera_support_requirements`` about it.
+IMAGE_SIZE_FEATURES: tuple[str, ...] = ("fixed_shape_ranges",)
+BASELINE_IMAGE_SIZE_FEATURES = frozenset({"fixed_shape_ranges"})
+
 ImageSize = tuple[int, int]
 SizePreference = Union[ImageSize, str]  # noqa: UP007 -- benchmark environments include Python 3.10
 SizePreferences = tuple[SizePreference, ...]
@@ -171,6 +178,36 @@ def camera_support_from_dict(value: Mapping[str, Any]) -> CameraSupportTable:
     if not isinstance(value, Mapping):
         raise ValueError(f"camera support table must be an object; got {value!r}")
     return {str(feature): CameraSupport.from_dict(support) for feature, support in value.items()}
+
+
+def camera_support_requirements(feature: FeatureSpec, support: CameraSupport) -> frozenset[str]:
+    """The image-size features a Policy server needs to apply ``support`` correctly."""
+
+    if support.min_size is None or support.max_size is None:
+        return frozenset()
+    if spatial_size(feature) is not None:
+        return frozenset({"fixed_shape_ranges"})
+    # A size range for a feature whose spec leaves its shape open.
+    return frozenset({"open_shape_ranges"})
+
+
+def camera_support_for_server(
+    benchmark: BenchmarkSpec,
+    camera_support: Mapping[str, CameraSupport],
+    server_features: frozenset[str] | set[str],
+) -> CameraSupportTable:
+    """Keep the entries a server with ``server_features`` understands; others render their declared size."""
+
+    fixed = fixed_camera_support(benchmark)
+    features = {feature.name: feature for feature in benchmark.features}
+    table: CameraSupportTable = {}
+    for name, support in camera_support.items():
+        feature = features.get(name)
+        if feature is not None and not camera_support_requirements(feature, support) <= server_features:
+            table[name] = fixed.get(name, CameraSupport(canonical=spatial_size(feature)))
+        else:
+            table[name] = support
+    return table
 
 
 def negotiate_image_sizes(
