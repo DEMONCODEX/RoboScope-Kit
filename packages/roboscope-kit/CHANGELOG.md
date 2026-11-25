@@ -4,10 +4,12 @@ Platform-only release notes from earlier versions are omitted; other changes rel
 
 ## 0.8.0b86 - 2026-11-26
 
-- Render ManiSkill cameras at Policy-negotiated sizes. ManiSkill declares 16–512 pixels per side for
+- Render ManiSkill's field-of-view cameras at Policy-negotiated sizes, 16–512 pixels per side for
   `images.primary`, `images.wrist` and `images.auxiliary`; the Worker sets each negotiated camera's
-  `sensor_configs` width and height, so the simulator renders that size directly. Without `image_sizes`
-  every camera keeps its task's own size and the Worker builds the environment exactly as before.
+  `sensor_configs` width and height, so the simulator renders that size directly. The Bridge camera keeps
+  480 × 640, because it is defined by a pixel intrinsic for that size over a real photo, so suites with
+  Bridge tasks keep every camera at its own size. Without `image_sizes` every camera keeps its task's own
+  size and the Worker builds the environment exactly as before.
 
 ## 0.8.0b85 - 2026-11-26
 

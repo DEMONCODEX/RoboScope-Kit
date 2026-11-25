@@ -98,8 +98,12 @@ upstream observation and map declared camera RGB pixels to `images.primary`, `im
 `images.auxiliary`. Native image shape and uint8 pixels are retained: each camera renders at its
 task's own size unless a Policy negotiates another size with `PolicyCapabilities.image_sizes` (16–512
 pixels per side). The Worker then sets that camera's `sensor_configs` width and height, so the
-simulator renders the negotiated size directly; Kit never resamples, and a depth or segmentation
-channel from the same camera has the same size. The optional
+field-of-view camera renders the negotiated size directly; Kit never resamples, and a depth or
+segmentation channel from the same camera has the same size. The Bridge camera keeps 480 × 640: it is
+defined by a pixel intrinsic for that size and composited over a real photo, so another size would
+show a cropped view. Suites with Bridge tasks (`bridge_rgb_v1`, `upstream_tasks_v1`) therefore keep
+every camera at its own size, and a custom suite that asks for another size on a Bridge profile stops
+before any Worker starts. The optional
 `language.instruction` comes from the profile. Model-specific normalization and preprocessing
 belong to the Policy implementation. The optional `include_joint_names` profile setting adds
 actual active/controller joint identities to episode metadata without adding observation features.

@@ -13,7 +13,7 @@ from typing import Any
 from roboscope_kit.runtime.benchmark import ProcessSpec, WorkerContext, WorkItem, WorkResult
 
 from .metrics import overall_task_results
-from .profile import PROTOCOL_ID
+from .profile import PROTOCOL_ID, fixed_size_cameras
 
 
 @dataclass(frozen=True)
@@ -69,7 +69,16 @@ class ManiSkillBenchmarkAdapter:
             "--worker-state-dir", str(context.state_dir),
             "--policy-batch-size", str(self.config.policy_batch_size),
         )
-        for feature, (height, width) in sorted(context.execution_contract.image_sizes.items()):
+        image_sizes = context.execution_contract.image_sizes
+        for profile in self.config.profiles:
+            fixed = sorted(set(image_sizes) & set(fixed_size_cameras(profile)))
+            if fixed:
+                raise ValueError(
+                    f"ManiSkill {profile['profile_id']} renders {', '.join(fixed)} only at the task's own "
+                    "size: its camera uses a fixed pixel intrinsic over a real-image background. "
+                    "Evaluate it without image_sizes or with ANY_SIZE."
+                )
+        for feature, (height, width) in sorted(image_sizes.items()):
             command += ("--image-size", f"{feature}={height}x{width}")
         return ProcessSpec(
             command=command,

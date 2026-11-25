@@ -637,14 +637,16 @@ CALVIN_MAX_IMAGE_SIZE = (1024, 1024)
 # rescales a square of the frame's height, and its fog adds a 256 x 256 plasma map, so the agent
 # view renders square sizes of at most 256 pixels. The wrist camera has the LIBERO range.
 LIBERO_PLUS_PRIMARY_MAX_IMAGE_SIZE = (256, 256)
-# ManiSkill cameras render natively at any sensor_configs width and height. Each task fixes its own
-# default size (128 x 128 for the tabletop base camera, 480 x 640 for the Bridge camera), and one suite
-# may mix tasks, so the canonical size stays the task's own and is not declared here. At 512 x 512,
-# one 10-environment vector group with all three RGB cameras and both depth channels at that size is
-# a 59.4 MB JSON act_batch message, within the 64 MiB protocol limit.
-MANISKILL_CAMERA_FEATURES = ("images.primary", "images.wrist", "images.auxiliary")
+# ManiSkill's field-of-view cameras render natively at any sensor_configs width and height. Each task
+# fixes its own default size (128 x 128 for the tabletop base camera), and one suite may mix tasks, so
+# the canonical size stays the task's own and is not declared here. At 512 x 512, one 10-environment
+# vector group with all three RGB cameras and both depth channels at that size is a 59.4 MB JSON
+# act_batch message, within the 64 MiB protocol limit. The Bridge camera is defined by a pixel
+# intrinsic for 640 x 480 and composited over a real photo, so another size would crop the view; the
+# stock suites with Bridge tasks keep every camera at its own size.
 MANISKILL_MIN_IMAGE_SIZE = (16, 16)
 MANISKILL_MAX_IMAGE_SIZE = (512, 512)
+MANISKILL_FIXED_SIZE_SUITES = frozenset({"bridge_rgb_v1", "upstream_tasks_v1"})
 
 
 def benchmark_camera_support(
@@ -697,10 +699,13 @@ def benchmark_camera_support(
             min_size=LIBERO_MIN_IMAGE_SIZE,
             max_size=maximum,
         )
-    elif benchmark.name == BenchmarkName.MANISKILL.value:
-        for feature in MANISKILL_CAMERA_FEATURES:
+    elif (benchmark.name == BenchmarkName.MANISKILL.value
+          and benchmark.suite not in MANISKILL_FIXED_SIZE_SUITES):
+        for feature, support in table.items():
             table[feature] = CameraSupport(
-                canonical=None, min_size=MANISKILL_MIN_IMAGE_SIZE, max_size=MANISKILL_MAX_IMAGE_SIZE,
+                canonical=support.canonical,
+                min_size=MANISKILL_MIN_IMAGE_SIZE,
+                max_size=MANISKILL_MAX_IMAGE_SIZE,
             )
     return table
 
