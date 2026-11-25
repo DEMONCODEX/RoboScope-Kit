@@ -437,3 +437,89 @@ def test_worker_builds_environments_and_observations_at_the_render_size(
     assert worker.parse_args().image_size == (256, 256)
     monkeypatch.setattr(sys, "argv", ["worker", *parser_args, "--image-size", "128x160"])
     assert worker.parse_args().image_size == (128, 160)
+
+
+ROBOCASA365_CAMERAS = ("images.agentview_left", "images.agentview_right", "images.wrist")
+
+
+def _robocasa365_negotiation(image_sizes, server_features=None):
+    import roboscope_kit
+    from roboscope_kit import PolicyCapabilities
+    from roboscope_kit.benchmark_specs import benchmark_camera_support, get_benchmark_spec
+    from roboscope_kit.image_sizes import camera_support_for_server
+
+    spec = get_benchmark_spec("robocasa365", "target50")
+    table = benchmark_camera_support(spec, {})
+    if server_features is not None:
+        table = camera_support_for_server(spec, table, server_features)
+    capabilities = PolicyCapabilities(
+        supported_benchmarks=("robocasa365",), required_features=(), image_sizes=image_sizes,
+    )
+    return spec, table, capabilities, roboscope_kit.negotiate_policy_action_contract(
+        spec, capabilities, camera_support=table,
+    ).image_sizes
+
+
+@pytest.mark.parametrize(("image_sizes", "expected"), [
+    ({"images.wrist": [(128, 128), "any"]}, {}),
+    ({"images.agentview_left": [(224, 224), "any"], "images.agentview_right": [(224, 224), "any"],
+      "images.wrist": [(128, 128), "any"]}, {}),
+    ({"images.agentview_left": [(224, 224)], "images.agentview_right": [(224, 224)],
+      "images.wrist": [(128, 128), (224, 224)]}, dict.fromkeys(ROBOCASA365_CAMERAS, (224, 224))),
+    ([(224, 224), "any"], dict.fromkeys(ROBOCASA365_CAMERAS, (224, 224))),
+    ([(2048, 2048), "any"], {}),
+])
+def test_cameras_in_a_size_group_negotiate_one_size_together(image_sizes, expected) -> None:
+    assert _robocasa365_negotiation(image_sizes)[3] == expected
+
+
+def test_size_group_refusal_names_the_group_and_every_cameras_list() -> None:
+    with pytest.raises(ValueError, match=r"size group 'robocasa365.cameras'.*images.wrist \[128x128\]"):
+        _robocasa365_negotiation({"images.wrist": [(128, 128)]})
+
+
+def test_servers_without_shared_sizes_are_offered_the_canonical_size_only() -> None:
+    from roboscope_kit.image_sizes import (
+        BASELINE_IMAGE_SIZE_FEATURES,
+        IMAGE_SIZE_FEATURES,
+        CameraSupport,
+        camera_support_from_dict,
+        camera_support_to_dict,
+    )
+
+    assert "shared_sizes" in IMAGE_SIZE_FEATURES
+    _, table, _, sizes = _robocasa365_negotiation([(128, 160), "any"], BASELINE_IMAGE_SIZE_FEATURES)
+    assert sizes == {}
+    assert all(table[camera] == CameraSupport(canonical=(256, 256)) for camera in ROBOCASA365_CAMERAS)
+    with pytest.raises(ValueError, match="renders only 256x256"):
+        _robocasa365_negotiation([(128, 160)], BASELINE_IMAGE_SIZE_FEATURES)
+    full = _robocasa365_negotiation([(128, 160)])[1]
+    assert camera_support_from_dict(camera_support_to_dict(full)) == full
+    assert camera_support_to_dict(full)["images.wrist"]["size_group"] == "robocasa365.cameras"
+    for bad in ("", 3):
+        with pytest.raises(ValueError, match="size_group"):
+            CameraSupport.from_dict({"canonical": [256, 256], "size_group": bad})
+
+
+@pytest.mark.parametrize("image_sizes", [
+    {"images.wrist": [(128, 128), "any"]}, [(128, 160)], [(224, 224), "any"],
+    {"images.agentview_left": [(640, 640), "any"], "images.agentview_right": [(640, 640)],
+     "images.wrist": [(640, 640)]},
+])
+def test_policy_server_negotiates_the_same_group_size_as_the_kit(tmp_path: Path, image_sizes) -> None:
+    import roboscope_kit
+    from roboscope_kit.image_sizes import apply_image_sizes, camera_support_to_dict
+
+    spec, table, capabilities, kit_sizes = _robocasa365_negotiation(image_sizes)
+
+    class GroupPolicy(roboscope_kit.Policy):
+        def load(self, context):
+            return capabilities
+
+        def act(self, observation):
+            raise AssertionError("not called")
+
+    server = roboscope_kit.PolicyServer(GroupPolicy(), tmp_path / "policy.sock")
+    context = roboscope_kit.SessionContext(session_id="s", checkpoint_path="/ckpt", benchmark=spec)
+    server._dispatch("load", {"context": context.to_dict(), "camera_support": camera_support_to_dict(table)})
+    assert server.context.benchmark == apply_image_sizes(spec, kit_sizes, table)

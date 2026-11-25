@@ -106,9 +106,14 @@ A Policy can negotiate another native render size with
 three cameras, because the official Gym wrapper takes one width and one height.
 At 640 x 640 one `act_batch` request (five slots, three cameras, two frames)
 is 47 MiB as JSON, within the 64 MiB Policy message limit.
-The cameras then render directly at that size, the images have shape
-`(2,H,W,3)`, and `policy_io.canonical_observations` is `false`. A negotiation
-that gives the cameras different sizes stops before any Worker starts.
+The three cameras form one size group: the negotiation takes the first size,
+in camera order and each camera's preference order, that every camera accepts
+(a listed size, or 256 x 256 when the camera's list ends with `ANY_SIZE`). The
+cameras then render directly at that size, the images have shape `(2,H,W,3)`,
+and `policy_io.canonical_observations` is `false`. When no size suits every
+camera, the run stops before any Worker starts and names each camera's list.
+These sizes need roboscope-kit 0.8.0b87 or later in the Policy environment;
+an older Policy SDK gets 256 x 256, as before.
 
 | Kit feature | Upstream source | Shape / dtype |
 |---|---|---|
