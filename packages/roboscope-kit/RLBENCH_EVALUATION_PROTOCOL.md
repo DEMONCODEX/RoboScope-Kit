@@ -172,7 +172,10 @@ The worker uses PerAct's observation configuration (`create_obs_config`): camera
 masks and the overhead camera off, joint positions and velocities, gripper pose, open state, matrix, and
 finger positions on. It additionally keeps the depth buffer, which RLBench captures for the point cloud
 anyway, so rendering and point clouds are unchanged. Every observation carries, converted from RLBench's
-`Observation` without any other change:
+`Observation` without any other change. A Policy can negotiate another native render size per camera with
+`PolicyCapabilities.image_sizes` (32–1024 pixels per side, `(height, width)`); RLBench then sets that
+camera's vision-sensor resolution, so its RGB, depth, point cloud and intrinsics all have the negotiated
+size, and `policy_io.canonical_observations` is `false`. The shapes below are PerAct's 128x128:
 
 | Feature | Shape, dtype | Source |
 | --- | --- | --- |
