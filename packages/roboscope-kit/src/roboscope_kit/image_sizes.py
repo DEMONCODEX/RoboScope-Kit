@@ -317,11 +317,18 @@ def negotiate_image_sizes(
         group = support_table[feature.name].size_group
         if group is not None:
             groups.setdefault(group, []).append(feature.name)
+    # A mapping names some cameras; a flat list names every camera.
+    named = set(requested) if isinstance(requested, dict) else names
     shared = {
         name: size
         for group, members in groups.items()
         for name, size in _negotiate_group(
-            benchmark.name, group, members, {name: preferences_of(name) for name in members}, support_table
+            benchmark.name,
+            group,
+            members,
+            {name: preferences_of(name) for name in members},
+            _group_support(benchmark.name, group, members, support_table),
+            named,
         ).items()
     }
     resolved: dict[str, ImageSize] = {}
@@ -358,23 +365,44 @@ def _describe_preferences(preferences: SizePreferences) -> str:
     return ", ".join(ANY_SIZE if item == ANY_SIZE else f"{item[0]}x{item[1]}" for item in preferences)
 
 
+def _group_support(
+    benchmark: str, group: str, members: list[str], support_table: Mapping[str, CameraSupport]
+) -> CameraSupport:
+    """The sizes every camera of ``group`` shares; the group's cameras must declare the same ones."""
+
+    shapes = {
+        (support.canonical, support.min_size, support.max_size, support.square)
+        for support in (support_table[name] for name in members)
+    }
+    if len(shapes) != 1:
+        raise ValueError(
+            f"{benchmark} size group {group!r} cameras {', '.join(members)} must share canonical, "
+            "min_size, max_size and square"
+        )
+    support = support_table[members[0]]
+    if support.canonical is not None and not support.renders(support.canonical):
+        raise ValueError(f"{benchmark} size group {group!r} must render its canonical size")
+    return support
+
+
 def _negotiate_group(
     benchmark: str,
     group: str,
     members: list[str],
     preferences: Mapping[str, SizePreferences],
-    support_table: Mapping[str, CameraSupport],
+    support: CameraSupport,
+    named: set[str],
 ) -> dict[str, ImageSize | None]:
-    """Pick the one size every camera of ``group`` accepts and renders.
+    """Pick the one size every camera of ``group`` accepts and ``support`` renders.
 
-    Candidates are each member's preferences in feature order, ``ANY_SIZE`` standing for that member's
-    canonical size. A member accepts a size it lists, or its canonical size when its list ends with
-    ``ANY_SIZE``. The first candidate every member accepts and renders wins.
+    Candidates are each member's preferences in feature order, ``ANY_SIZE`` standing for the group's
+    canonical size. A member accepts a size it lists, or the canonical size when its list ends with
+    ``ANY_SIZE``. The first candidate every member accepts and the group renders wins. ``named`` holds
+    the cameras the Policy lists sizes for; the others accept only the canonical size.
     """
 
     def accepts(name: str, size: ImageSize | None) -> bool:
         listed = preferences[name]
-        support = support_table[name]
         if size == support.canonical:
             return size in listed or listed[-1] == ANY_SIZE
         return size is not None and size in listed and support.renders(size)
@@ -382,14 +410,18 @@ def _negotiate_group(
     candidates: list[ImageSize | None] = []
     for name in members:
         for preference in preferences[name]:
-            size = support_table[name].canonical if preference == ANY_SIZE else preference
+            size = support.canonical if preference == ANY_SIZE else preference
             if size not in candidates:
                 candidates.append(size)  # type: ignore[arg-type]
     for size in candidates:
         if all(accepts(name, size) for name in members):
             return dict.fromkeys(members, size)
-    offered = "; ".join(f"{name} [{_describe_preferences(preferences[name])}]" for name in members)
-    support = support_table[members[0]]
+    own = "its own size" if support.canonical is None else f"{support.canonical[0]}x{support.canonical[1]}"
+    offered = "; ".join(
+        f"{name} [{_describe_preferences(preferences[name])}]" if name in named
+        else f"{name} not listed ({own} only)"
+        for name in members
+    )
     raise ValueError(
         f"{benchmark} cameras {', '.join(members)} (size group {group!r}) render one shared size: "
         f"{support.describe()}; no size is accepted by every camera: the Policy accepts {offered}"

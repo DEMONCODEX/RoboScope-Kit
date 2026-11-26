@@ -13,9 +13,10 @@ Platform-only release notes from earlier versions are omitted; other changes rel
 - `CameraSupport.size_group` makes cameras render one size, negotiated jointly: the first size, in
   feature order and each camera's preference order, that every camera of the group accepts (a listed
   size, or its canonical size when its list ends with `ANY_SIZE`). When none suits every camera, the run
-  stops before any Worker starts and names the group and each camera's list. Policy servers report the
-  `shared_sizes` image-size feature for it; a Policy whose own environment runs an older roboscope-kit
-  gets RoboCasa365's 256 × 256, as before.
+  stops before any Worker starts and names the group, each camera's list and the cameras the Policy did
+  not list. Negotiation checks that the cameras of a group declare one canonical size, range and
+  squareness. Policy servers report the `shared_sizes` image-size feature for it; a Policy whose own
+  environment runs an older roboscope-kit gets RoboCasa365's 256 × 256, as before.
 - A flat `image_sizes` list applies to every camera, so a Policy that already declares, for example,
   `[(224, 224), ANY_SIZE]` now receives native 224 × 224 RoboCasa365 images with
   `canonical_observations: false` instead of 256 × 256.

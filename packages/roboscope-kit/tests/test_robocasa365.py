@@ -474,7 +474,11 @@ def test_cameras_in_a_size_group_negotiate_one_size_together(image_sizes, expect
 
 
 def test_size_group_refusal_names_the_group_and_every_cameras_list() -> None:
-    with pytest.raises(ValueError, match=r"size group 'robocasa365.cameras'.*images.wrist \[128x128\]"):
+    with pytest.raises(
+        ValueError,
+        match=r"size group 'robocasa365.cameras'.*images.agentview_left not listed \(256x256 only\);"
+        r".*images.wrist \[128x128\]",
+    ):
         _robocasa365_negotiation({"images.wrist": [(128, 128)]})
 
 
