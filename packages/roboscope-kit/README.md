@@ -263,8 +263,8 @@ RLBench renders each camera at 32 to 768 pixels per side, with its depth and poi
 size (other RLBench sizes need roboscope-kit 0.8.0b84 or later in the Policy environment); LIBERO-Plus
 renders the LIBERO wrist sizes and square agent views from 64 x 64 to 256 x 256, the sizes its image
 corruptions support (square agent-view sizes need roboscope-kit 0.8.0b85 or later in the Policy
-environment); ManiSkill's tabletop cameras render any size from 16 to 512 pixels per side, while its
-Bridge camera keeps 480 x 640 (ManiSkill sizes need roboscope-kit 0.8.0b83 or later in the Policy
+environment); the ManiSkill cameras a suite's tasks use render any size from 16 to 512 pixels per side,
+while the Bridge camera keeps 480 x 640 (ManiSkill sizes need roboscope-kit 0.8.0b83 or later in the Policy
 environment); the other benchmarks render their own size only. Sizes that differ from the benchmark's own are recorded in
 `policy_io.image_sizes`, and `policy_io.canonical_observations` is then `false`, so such results are not
 mixed with results under the benchmark's protocol. Inside `load()`,
