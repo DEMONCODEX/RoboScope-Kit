@@ -20,22 +20,60 @@ SUITES = ("libero_spatial", "libero_object", "libero_goal", "libero_10")
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--openvla-root", type=Path, required=True)
-    parser.add_argument("--checkpoint", type=Path, required=True)
-    parser.add_argument("--suite", choices=SUITES, required=True)
-    parser.add_argument("--episodes-per-task", type=int, default=5)
-    parser.add_argument("--seed", type=int, default=7)
-    parser.add_argument("--env-seed", type=int, default=7)
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--openvla-root",
+        type=Path,
+        required=True,
+        help="Path to the official openvla checkout (at revision c8f03f4)",
+    )
+    parser.add_argument(
+        "--checkpoint",
+        type=Path,
+        required=True,
+        help="Path to the OpenVLA checkpoint directory to evaluate",
+    )
+    parser.add_argument(
+        "--suite",
+        choices=SUITES,
+        required=True,
+        help="LIBERO suite to evaluate (libero_spatial, libero_object, libero_goal, libero_10)",
+    )
+    parser.add_argument(
+        "--episodes-per-task",
+        type=int,
+        default=5,
+        help="Number of evaluation episodes per task (1-50, default: 5)",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=7,
+        help="Python / NumPy random seed for policy inference (default: 7)",
+    )
+    parser.add_argument(
+        "--env-seed",
+        type=int,
+        default=7,
+        help="Environment initial state seed passed to LIBERO (default: 7)",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        required=True,
+        help="Directory to store evaluation records and run metadata",
+    )
     args = parser.parse_args()
     if not 1 <= args.episodes_per_task <= 50:
         parser.error("--episodes-per-task must be between 1 and 50")
     root = args.openvla_root.resolve()
-    revision = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
+    revision = subprocess.check_output(
+        ["git", "-C", str(root), "rev-parse", "HEAD"], text=True
+    ).strip()
     if revision != UPSTREAM_REVISION:
         parser.error(f"OpenVLA checkout must be at {UPSTREAM_REVISION}")
     dirty = subprocess.check_output(
-        ["git", "-C", str(root), "status", "--porcelain", "--untracked-files=no"], text=True
+        ["git", "-C", str(root), "status", "--porcelain", "--untracked-files=no"],
+        text=True,
     )
     if dirty.strip():
         parser.error("OpenVLA checkout has modified tracked files")
@@ -50,9 +88,13 @@ def main() -> None:
     from experiments.robot.libero import run_libero_eval as upstream
 
     cfg = upstream.GenerateConfig(
-        pretrained_checkpoint=str(checkpoint), task_suite_name=args.suite,
-        num_trials_per_task=args.episodes_per_task, seed=args.seed,
-        center_crop=True, num_steps_wait=10, local_log_dir=str(output / "logs"),
+        pretrained_checkpoint=str(checkpoint),
+        task_suite_name=args.suite,
+        num_trials_per_task=args.episodes_per_task,
+        seed=args.seed,
+        center_crop=True,
+        num_steps_wait=10,
+        local_log_dir=str(output / "logs"),
         use_wandb=False,
     )
     state = {"task_id": -1, "steps": 0}
@@ -80,10 +122,16 @@ def main() -> None:
         # Called by upstream once per episode instead of writing a replay video.
         steps = state["steps"] - cfg.num_steps_wait
         if steps < 1 or len(images) != steps:
-            raise RuntimeError("Incomplete episode or failed action execution; reject this run")
-        row = {"suite": args.suite, "task_id": state["task_id"],
-               "episode_index": (index - 1) % args.episodes_per_task,
-               "success": bool(success), "steps": steps}
+            raise RuntimeError(
+                "Incomplete episode or failed action execution; reject this run"
+            )
+        row = {
+            "suite": args.suite,
+            "task_id": state["task_id"],
+            "episode_index": (index - 1) % args.episodes_per_task,
+            "success": bool(success),
+            "steps": steps,
+        }
         records.append(row)
         with (output / "native-episodes.jsonl").open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(row) + "\n")
@@ -91,11 +139,20 @@ def main() -> None:
 
     upstream.get_libero_env = get_env
     upstream.save_rollout_video = record_episode
-    run = {"upstream_revision": revision, "suite": args.suite,
-           "checkpoint": str(checkpoint), "seed": args.seed, "env_seed": args.env_seed,
-           "episodes_per_task": args.episodes_per_task, "settle_steps": 10,
-           "preprocessing": "CPU", "video": False, "complete": False,
-           "command": sys.argv, "started": time.time()}
+    run = {
+        "upstream_revision": revision,
+        "suite": args.suite,
+        "checkpoint": str(checkpoint),
+        "seed": args.seed,
+        "env_seed": args.env_seed,
+        "episodes_per_task": args.episodes_per_task,
+        "settle_steps": 10,
+        "preprocessing": "CPU",
+        "video": False,
+        "complete": False,
+        "command": sys.argv,
+        "started": time.time(),
+    }
     run_path = output / "run.json"
     run_path.write_text(json.dumps(run, indent=2) + "\n")
     started = time.perf_counter()
@@ -104,10 +161,14 @@ def main() -> None:
         upstream.eval_libero.__wrapped__(cfg)
         logs = list((output / "logs").glob("*.txt"))
         if any("Caught exception:" in p.read_text() for p in logs):
-            raise RuntimeError("Official evaluator caught an exception; reject this run")
+            raise RuntimeError(
+                "Official evaluator caught an exception; reject this run"
+            )
         if len(records) != 10 * args.episodes_per_task:
             raise RuntimeError("Incomplete ten-task evaluation")
-        run.update(complete=True, elapsed_s=time.perf_counter() - started, finished=time.time())
+        run.update(
+            complete=True, elapsed_s=time.perf_counter() - started, finished=time.time()
+        )
         run_path.write_text(json.dumps(run, indent=2) + "\n")
     finally:
         for env in environments:

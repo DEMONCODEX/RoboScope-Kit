@@ -2,6 +2,11 @@
 
 Platform-only release notes from earlier versions are omitted; other changes relevant to the Kit are retained.
 
+## 0.8.0b85 - 2026-11-26
+
+- Describe all command-line options in `--help` for the OpenVLA evaluation runner
+  (`examples/openvla/run_native.py`) and comparison script (`examples/openvla/compare_native.py`).
+
 ## 0.8.0b84 - 2026-11-26
 
 - Pin MessagePack in the robomimic runtime. The shared Policy client imports it since 0.8.0b27;
