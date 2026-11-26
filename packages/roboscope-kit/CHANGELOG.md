@@ -8,6 +8,8 @@ Platform-only release notes from earlier versions are omitted; other changes rel
   `--self-test`, `--benchmark-manifest`, and `--evaluation-config` in `roboscope_kit.runtime.benchmark`,
   and for `--benchmark`, `--suite`, `--episodes`, `--benchmark-manifest`, and `--output-dir` in
   `roboscope_kit.runtime.benchmark.shard_merge`.
+- The shard-merge `--help` usage example includes the required `--benchmark-manifest` and keeps its
+  line breaks.
 - RoboTwin cameras render Policy-negotiated image sizes natively. The head and both wrist cameras accept
   64–1024 pixels per side through `PolicyCapabilities.image_sizes`; a camera with a negotiated size is
   created at that width and height with the field of view, pose and random draws of its task config, so

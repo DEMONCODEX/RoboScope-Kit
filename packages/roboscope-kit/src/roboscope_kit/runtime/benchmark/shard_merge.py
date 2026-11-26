@@ -1,7 +1,7 @@
 # Copyright 2026 RoboScope Team
 # SPDX-License-Identifier: Apache-2.0
 
-"""Merge sharded evaluation results from independent GPU instances.
+r"""Merge sharded evaluation results from independent GPU instances.
 
 Each shard instance runs the same benchmark command with ``--shard-index I``
 (``--shard-count N`` explicit or derived from the workload size) and produces
@@ -17,6 +17,7 @@ shard keeps its own values as provenance.
 Usage:
     python -m roboscope_kit.runtime.benchmark.shard_merge \
         --benchmark robotwin --suite demo_clean \
+        --benchmark-manifest /path/to/benchmark-manifest.json \
         --shard-dir /runs/shard-0 --shard-dir /runs/shard-1 \
         --output-dir /runs/merged
 """
@@ -45,7 +46,9 @@ from .sharding import plan_shard, shard_build
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument(
         "--benchmark",
         choices=tuple(item.value for item in BenchmarkName),
