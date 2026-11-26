@@ -46,11 +46,29 @@ from .sharding import plan_shard, shard_build
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--benchmark", choices=tuple(item.value for item in BenchmarkName), required=True)
-    parser.add_argument("--suite", required=True)
-    parser.add_argument("--episodes", type=int)
+    parser.add_argument(
+        "--benchmark",
+        choices=tuple(item.value for item in BenchmarkName),
+        required=True,
+        help="benchmark evaluated by the shards",
+    )
+    parser.add_argument(
+        "--suite",
+        required=True,
+        help="benchmark suite evaluated by the shards",
+    )
+    parser.add_argument(
+        "--episodes",
+        type=int,
+        help="positive episode count overriding the manifest default; must match the shard runs",
+    )
     parser.add_argument("--evaluation-config", type=Path, help="resolved MetaWorld run configuration")
-    parser.add_argument("--benchmark-manifest", type=Path, required=True)
+    parser.add_argument(
+        "--benchmark-manifest",
+        type=Path,
+        required=True,
+        help="benchmark manifest (benchmark-manifest.json) used by the shard runs",
+    )
     parser.add_argument(
         "--shard-dir",
         action="append",
@@ -58,7 +76,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         required=True,
         help="output directory of one shard run; repeat for every shard",
     )
-    parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        required=True,
+        help="new or empty output directory for the merged result.json",
+    )
     return parser.parse_args(argv)
 
 

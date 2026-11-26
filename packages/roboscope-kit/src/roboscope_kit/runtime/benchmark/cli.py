@@ -59,16 +59,36 @@ from .timing import BenchmarkTimingRecorder, PhaseTimingCallback, benchmark_phas
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--benchmark", choices=tuple(item.value for item in BenchmarkName), required=True)
-    parser.add_argument("--suite")
+    parser.add_argument(
+        "--benchmark",
+        choices=tuple(item.value for item in BenchmarkName),
+        required=True,
+        help="benchmark to evaluate or self-test",
+    )
+    parser.add_argument(
+        "--suite",
+        help="benchmark suite to evaluate; required for evaluation, not for --self-test",
+    )
     parser.add_argument("--checkpoint-source", type=Path, help="absolute path to a local checkpoint")
     parser.add_argument(
         "--output-dir", type=Path, required=True,
         help="new or empty run directory; directories containing only errors.jsonl can be retried",
     )
-    parser.add_argument("--episodes", type=int)
-    parser.add_argument("--quick-test", action="store_true")
-    parser.add_argument("--self-test", action="store_true")
+    parser.add_argument(
+        "--episodes",
+        type=int,
+        help="positive episode count overriding the manifest default",
+    )
+    parser.add_argument(
+        "--quick-test",
+        action="store_true",
+        help="run a short real evaluation with one Worker and one Server",
+    )
+    parser.add_argument(
+        "--self-test",
+        action="store_true",
+        help="run benchmark runtime checks without loading the Policy",
+    )
     parser.add_argument(
         "--cuda-mps",
         action="store_true",
@@ -98,9 +118,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=DEFAULT_EPISODES_PER_SHARD,
         help="episode budget per shard when --shard-count is omitted",
     )
-    parser.add_argument("--benchmark-manifest", type=Path, required=True)
+    parser.add_argument(
+        "--benchmark-manifest",
+        type=Path,
+        required=True,
+        help="benchmark manifest (benchmark-manifest.json) defining suites, runtime paths, and defaults",
+    )
     parser.add_argument("--policy-config", type=Path, help="Policy process contract (roboscope-policy.json)")
-    parser.add_argument("--evaluation-config", type=Path)
+    parser.add_argument(
+        "--evaluation-config",
+        type=Path,
+        help="MetaWorld run configuration JSON (metaworld only); overrides the Policy config",
+    )
     parser.add_argument(
         "--profile",
         action="store_true",
