@@ -1608,7 +1608,10 @@ def test_camera_support_is_limited_to_what_the_policy_server_understands(tmp_pat
     calvin = roboscope_kit.get_benchmark_spec("calvin", "task_D_D")
     calvin_support = benchmark_camera_support(calvin, {})
     older = camera_support_for_server(calvin, calvin_support, BASELINE_IMAGE_SIZE_FEATURES)
-    assert older == dict.fromkeys(("images.static", "images.gripper"), CameraSupport(canonical=None))
+    assert older == {
+        "images.static": CameraSupport(canonical=(200, 200)),
+        "images.gripper": CameraSupport(canonical=(84, 84)),
+    }
     preferences = [(240, 320), roboscope_kit.ANY_SIZE]
     assert roboscope_kit.negotiate_policy_action_contract(
         calvin, _image_size_capabilities("calvin", preferences), camera_support=older
