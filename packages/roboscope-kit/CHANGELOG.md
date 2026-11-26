@@ -106,6 +106,17 @@ Platform-only release notes from earlier versions are omitted; other changes rel
   `[(224, 224), ANY_SIZE]` now receives native 224 × 224 CALVIN frames with
   `canonical_observations: false` instead of the canonical sizes.
 
+- Add the `libero.absolute-eef-v1` action representation to LIBERO, LIBERO+, and LIBERO-Pro: the seven values
+  are the absolute end-effector target position, axis-angle orientation, and gripper command. The adapters pass
+  the negotiated representation to the shared LIBERO worker, which keeps the 10 settle steps under delta control
+  and then sets `use_delta = False` on each robot's OSC controller for the rest of the episode, as the X-VLA
+  LIBERO client does. The default `libero.delta-eef-v1` path is unchanged.
+- Fix `examples/xvla` on LIBERO: the Policy returns absolute targets but declared the default delta
+  representation, and no worker patch switched the controller, so the targets were executed as deltas. It now
+  declares `libero.absolute-eef-v1` for LIBERO and LIBERO+; only LIBERO has been run with it. Episodes keep the
+  benchmark's suite horizons, so X-VLA's published LIBERO scores (800- and 900-step episodes) are not directly
+  comparable.
+
 ## 0.8.0b82 - 2026-11-26
 
 - The Policy server reports which image-size features it understands (`image_size_features` in its
