@@ -356,6 +356,7 @@ The exact contracts are in the protocol documents:
 - [robomimic](https://github.com/MINT-SJTU/RoboScope-Kit/blob/main/packages/roboscope-kit/ROBOMIMIC_EVALUATION_PROTOCOL.md):
   the `ph_low_dim` suite, supported and unsupported task/dataset/observation combinations, version and
   license gates, seeded initial states, upstream rollout semantics, the native comparison, and the baseline.
+  Its [throughput notes](https://github.com/MINT-SJTU/RoboScope-Kit/blob/main/benchmarks/robomimic/THROUGHPUT.md) record the matched fixed-K/G comparison, the compiled-model cache and native throughput.
 - [SimplerEnv](https://github.com/MINT-SJTU/RoboScope-Kit/blob/main/packages/roboscope-kit/SIMPLER_ENV_EVALUATION_PROTOCOL.md):
   the Google Robot visual-matching and variant-aggregation suites and the WidowX visual-matching suite, kept
   separate; the frozen pose sweeps, episode loop, termination, aggregation, the native comparison, and the
