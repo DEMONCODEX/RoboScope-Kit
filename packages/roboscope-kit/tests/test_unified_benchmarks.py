@@ -1512,7 +1512,7 @@ def test_rlbench_worker_command_carries_only_negotiated_sizes(tmp_path: Path) ->
     assert values == ["front=256x256", "wrist=96x160"]
     assert camera_sizes(camera_size(value) for value in values) == {"front": (256, 256), "wrist": (96, 160)}
     for bad in ("overhead=128x128", "front=128", "front=0x128"):
-        with pytest.raises(ValueError):
+        with pytest.raises(argparse.ArgumentTypeError):
             camera_size(bad)
     with pytest.raises(ValueError, match="more than one size"):
         camera_sizes([("front", (128, 128)), ("front", (64, 64))])

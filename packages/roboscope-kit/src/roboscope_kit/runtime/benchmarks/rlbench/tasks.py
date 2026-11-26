@@ -22,6 +22,7 @@ This module must import without the simulator: the kit, the CLI, and the build s
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import os
 import sys
@@ -206,17 +207,19 @@ def episode_state_sha256(variation: int, random_state: Any) -> str:
 
 
 def camera_size(value: str) -> tuple[str, tuple[int, int]]:
-    """Parse a ``CAMERA=HEIGHTxWIDTH`` command-line value."""
+    """Parse a ``CAMERA=HEIGHTxWIDTH`` command-line value; argparse reports the error message."""
 
     camera, _, size = value.partition("=")
     if camera not in CAMERAS:
-        raise ValueError(f"unknown RLBench camera in {value!r}; expected one of {', '.join(CAMERAS)}")
+        raise argparse.ArgumentTypeError(
+            f"unknown RLBench camera in {value!r}; expected one of {', '.join(CAMERAS)}"
+        )
     try:
         height, width = (int(part) for part in size.lower().split("x"))
     except ValueError as exc:
-        raise ValueError(f"expected CAMERA=HEIGHTxWIDTH, got {value!r}") from exc
+        raise argparse.ArgumentTypeError(f"expected CAMERA=HEIGHTxWIDTH, got {value!r}") from exc
     if height < 1 or width < 1:
-        raise ValueError(f"RLBench camera size must be positive, got {value!r}")
+        raise argparse.ArgumentTypeError(f"RLBench camera size must be positive, got {value!r}")
     return camera, (height, width)
 
 
