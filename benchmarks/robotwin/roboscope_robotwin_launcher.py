@@ -421,17 +421,33 @@ def instrument_eval_source(path):
 
 
 def _inject_camera_sizes(source):
-    """Record evaluation videos at the negotiated head-camera size (``ROBOTWIN_CAMERA_SIZES``)."""
+    """Record evaluation videos at the negotiated head-camera size (``ROBOTWIN_CAMERA_SIZES``).
+
+    RoboTwin encodes yuv420p with libx264, which needs even dimensions, so the video of an odd head-camera
+    size is padded by one pixel; the ffmpeg arguments for even sizes stay RoboTwin's own.
+    """
 
     value = os.environ.get("ROBOTWIN_CAMERA_SIZES")
     head = json.loads(value).get("head_camera") if value else None
     if head is None:
         return source
-    original = '        video_size = str(camera_config["w"]) + "x" + str(camera_config["h"])\n'
-    if source.count(original) != 1:
-        raise RuntimeError(f"unexpected RoboTwin evaluator source near {original.strip()!r}")
     height, width = (int(dimension) for dimension in head)
-    return source.replace(original, f'        video_size = "{width}x{height}"\n')
+    replacements = {
+        '        video_size = str(camera_config["w"]) + "x" + str(camera_config["h"])\n': (
+            f'        video_size = "{width}x{height}"\n'
+        ),
+    }
+    if height % 2 or width % 2:
+        replacements['                    "-pix_fmt",\n'] = (
+            '                    "-vf",\n'
+            '                    "pad=ceil(iw/2)*2:ceil(ih/2)*2",\n'
+            '                    "-pix_fmt",\n'
+        )
+    for original, replacement in replacements.items():
+        if source.count(original) != 1:
+            raise RuntimeError(f"unexpected RoboTwin evaluator source near {original.strip()!r}")
+        source = source.replace(original, replacement)
+    return source
 
 
 def _inject_runtime_contract(source):

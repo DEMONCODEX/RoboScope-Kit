@@ -37,7 +37,7 @@ MEMORY_FAILURE_TOKENS = (
 # same constant is SERVICE_LOST_MARKER in benchmarks/robotwin/roboscope_robotwin_render.py.
 RENDER_SERVICE_LOST_PREFIX = "ROBOSCOPE_ROBOTWIN_RENDER_SERVICE_LOST"
 # Worker flag -> RoboTwin camera it sizes. The launcher reads the sizes from CAMERA_SIZES_ENV, the same
-# constant as in benchmarks/robotwin/roboscope_robotwin_render.py.
+# constant as in benchmarks/robotwin/roboscope_robotwin_launcher.py.
 CAMERA_SIZE_FLAGS = (
     ("--head-size", "head_camera"),
     ("--left-wrist-size", "left_camera"),
@@ -91,6 +91,15 @@ def _image_size(value: str) -> tuple[int, int]:
     if height < 1 or width < 1:
         raise argparse.ArgumentTypeError(f"image size must be positive, got {value!r}")
     return height, width
+
+
+def _inherited_env() -> dict[str, str]:
+    """The Worker's environment for an evaluator, without a camera-size override it may have inherited.
+
+    Only ``_camera_env`` sets CAMERA_SIZES_ENV, so the evaluator renders the sizes ``policy_io`` records.
+    """
+
+    return {name: value for name, value in os.environ.items() if name != CAMERA_SIZES_ENV}
 
 
 def _camera_env(args: argparse.Namespace) -> dict[str, str]:
@@ -186,7 +195,7 @@ class _EvalSession:
 
     def _spawn(self) -> subprocess.Popen:
         env = {
-            **os.environ,
+            **_inherited_env(),
             # The RoboTwin runtime may live on read-only or inode-limited storage,
             # where writing __pycache__ fails and makes imports (e.g.
             # planner.CuroboPlanner) intermittently crash. Evaluate without
@@ -425,7 +434,7 @@ def _run_task_single_process(args: argparse.Namespace, item: WorkItem) -> WorkRe
     write_deploy_policy(args.deploy_policy, deploy_policy)
     task_env, argv_tail = _task_spec(args, item, deploy_policy)
     env = {
-        **os.environ,
+        **_inherited_env(),
         # The RoboTwin runtime may live on read-only or inode-limited storage,
         # where writing __pycache__ fails and makes imports (e.g.
         # planner.CuroboPlanner) intermittently crash. Evaluate without

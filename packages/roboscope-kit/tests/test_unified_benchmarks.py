@@ -2021,6 +2021,8 @@ def test_robotwin_worker_passes_camera_sizes_to_the_launcher_only_when_negotiate
     ]
     monkeypatch.setattr("sys.argv", base)
     assert worker._camera_env(worker.parse_args()) == {}
+    monkeypatch.setenv(worker.CAMERA_SIZES_ENV, '{"head_camera": [96, 96]}')
+    assert worker.CAMERA_SIZES_ENV not in worker._inherited_env()
     monkeypatch.setattr("sys.argv", [*base, "--head-size", "224x224", "--right-wrist-size", "128x160"])
     env = worker._camera_env(worker.parse_args())
     assert json.loads(env[worker.CAMERA_SIZES_ENV]) == {"head_camera": [224, 224], "right_camera": [128, 160]}
@@ -2065,6 +2067,7 @@ def test_robotwin_launcher_sizes_videos_only_with_a_negotiated_head_camera(monke
     source = (
         '    if args["eval_video_log"]:\n'
         '        video_size = str(camera_config["w"]) + "x" + str(camera_config["h"])\n'
+        '                    "-pix_fmt",\n'
     )
     monkeypatch.delenv("ROBOTWIN_CAMERA_SIZES", raising=False)
     assert launcher._inject_camera_sizes(source) == source
@@ -2072,6 +2075,10 @@ def test_robotwin_launcher_sizes_videos_only_with_a_negotiated_head_camera(monke
     assert launcher._inject_camera_sizes(source) == source
     monkeypatch.setenv("ROBOTWIN_CAMERA_SIZES", '{"head_camera": [180, 320]}')
     assert '        video_size = "320x180"\n' in launcher._inject_camera_sizes(source)
+    assert "pad=" not in launcher._inject_camera_sizes(source)
+    monkeypatch.setenv("ROBOTWIN_CAMERA_SIZES", '{"head_camera": [181, 321]}')
+    padded = launcher._inject_camera_sizes(source)
+    assert '"pad=ceil(iw/2)*2:ceil(ih/2)*2",\n                    "-pix_fmt"' in padded
 
 
 def test_robotwin_camera_sizes_are_offered_only_to_servers_with_open_shape_ranges() -> None:
@@ -2090,5 +2097,6 @@ def test_robotwin_camera_sizes_are_offered_only_to_servers_with_open_shape_range
     # A roboscope-kit 0.8.0b77 server keeps RoboTwin's own size, as 0.8.0b77 does.
     older = camera_support_for_server(spec, table, BASELINE_IMAGE_SIZE_FEATURES)
     assert negotiate_image_sizes(spec, ((224, 224), roboscope_kit.ANY_SIZE), older) == {}
-    with pytest.raises(ValueError, match="unspecified"):
+    assert negotiate_image_sizes(spec, ((240, 320),), older) == {}
+    with pytest.raises(ValueError, match="renders only 240x320"):
         negotiate_image_sizes(spec, ((224, 224),), older)

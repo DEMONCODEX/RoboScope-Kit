@@ -8,8 +8,11 @@ Platform-only release notes from earlier versions are omitted; other changes rel
   64–1024 pixels per side through `PolicyCapabilities.image_sizes`; a camera with a negotiated size is
   created at that width and height with the field of view, pose and random draws of its task config, so
   the `task_config` files and the frozen seed protocol are unchanged. The vertical field of view stays,
-  so the horizontal view follows the aspect ratio: 224 × 224 shows about 23% less at the sides than
-  240 × 320. Without `image_sizes` the simulator is set up exactly as before.
+  so the horizontal view follows the aspect ratio: at 224 × 224 the horizontal field of view narrows from
+  about 48° to 37°. Evaluation videos of an odd head-camera size are padded by one pixel, since libx264's
+  yuv420p needs even dimensions. Each evaluator receives only the negotiated sizes, so a
+  `ROBOTWIN_CAMERA_SIZES` exported in the Kit's environment has no effect. Without `image_sizes` the
+  simulator is set up exactly as before.
 - RoboTwin offers these sizes only with native rendering on a runtime whose manifest sets
   `negotiated_camera_sizes` (built by this release's `build-runtime.sh`). `render_mode: central`, and a
   runtime built before this release until it is rebuilt, keep 240 × 320.
