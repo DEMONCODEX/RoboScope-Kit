@@ -1511,3 +1511,35 @@ def test_metaworld_offscreen_buffer_grows_to_the_largest_negotiated_camera() -> 
     cameras = ({"render_width": 160, "render_height": 96}, {"render_width": 120, "render_height": 200})
     _fit_offscreen_buffer(env, cameras)
     assert (visual.offwidth, visual.offheight) == (160, 200)
+
+
+def test_camera_support_is_limited_to_what_the_policy_server_understands(tmp_path: Path) -> None:
+    from dataclasses import replace
+
+    from roboscope_kit.contracts import FeatureKind, FeatureSpec
+    from roboscope_kit.image_sizes import (
+        BASELINE_IMAGE_SIZE_FEATURES,
+        IMAGE_SIZE_FEATURES,
+        CameraSupport,
+        camera_support_for_server,
+        camera_support_requirements,
+    )
+
+    spec = roboscope_kit.get_benchmark_spec("libero", "libero_10")
+    ranged = CameraSupport(canonical=(256, 256), min_size=(64, 64), max_size=(1024, 1024))
+    assert camera_support_requirements(spec.features[0], ranged) == {"fixed_shape_ranges"}
+    shapeless = FeatureSpec(name="images.static", kind=FeatureKind.IMAGE, dtype="uint8")
+    assert camera_support_requirements(shapeless, CameraSupport(canonical=None)) == frozenset()
+    assert camera_support_requirements(shapeless, ranged) == {"open_shape_ranges"}
+    with_shapeless = replace(spec, features=(*spec.features, shapeless))
+    table = {"images.primary": ranged, "images.static": ranged}
+    limited = camera_support_for_server(with_shapeless, table, BASELINE_IMAGE_SIZE_FEATURES)
+    assert limited["images.primary"] == ranged
+    assert limited["images.static"] == CameraSupport(canonical=(256, 256))
+    everything = BASELINE_IMAGE_SIZE_FEATURES | {"open_shape_ranges"}
+    assert camera_support_for_server(with_shapeless, table, everything) == table
+
+    server = roboscope_kit.PolicyServer(object(), tmp_path / "policy.sock")
+    assert server._dispatch("health", {})["image_size_features"] == list(IMAGE_SIZE_FEATURES)
+    with_encodings = server._dispatch("health", {"encodings": ["json"]})
+    assert with_encodings["image_size_features"] == list(IMAGE_SIZE_FEATURES)
