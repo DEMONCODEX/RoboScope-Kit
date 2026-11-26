@@ -196,18 +196,31 @@ def camera_support_for_server(
     camera_support: Mapping[str, CameraSupport],
     server_features: frozenset[str] | set[str],
 ) -> CameraSupportTable:
-    """Keep the entries a server with ``server_features`` understands; others render their declared size."""
+    """Keep the entries a server with ``server_features`` understands; others offer their canonical size."""
 
-    fixed = fixed_camera_support(benchmark)
+    withheld = withheld_camera_support(benchmark, camera_support, server_features)
+    return {
+        name: CameraSupport(canonical=support.canonical) if name in withheld else support
+        for name, support in camera_support.items()
+    }
+
+
+def withheld_camera_support(
+    benchmark: BenchmarkSpec,
+    camera_support: Mapping[str, CameraSupport],
+    server_features: frozenset[str] | set[str],
+) -> dict[str, frozenset[str]]:
+    """Each camera whose sizes a server with ``server_features`` cannot apply, with the features it lacks."""
+
     features = {feature.name: feature for feature in benchmark.features}
-    table: CameraSupportTable = {}
+    withheld: dict[str, frozenset[str]] = {}
     for name, support in camera_support.items():
         feature = features.get(name)
-        if feature is not None and not camera_support_requirements(feature, support) <= server_features:
-            table[name] = fixed.get(name, CameraSupport(canonical=spatial_size(feature)))
-        else:
-            table[name] = support
-    return table
+        if feature is not None:
+            missing = camera_support_requirements(feature, support) - server_features
+            if missing:
+                withheld[name] = frozenset(missing)
+    return withheld
 
 
 def negotiate_image_sizes(

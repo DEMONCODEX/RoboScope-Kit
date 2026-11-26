@@ -13,12 +13,13 @@ from pathlib import Path
 from typing import Any
 
 from roboscope_kit.benchmark_specs import BenchmarkName
-from roboscope_kit.client import PolicyClient
+from roboscope_kit.client import PolicyClient, PolicyRemoteError
 from roboscope_kit.contracts import BenchmarkSpec
 from roboscope_kit.image_sizes import (
     BASELINE_IMAGE_SIZE_FEATURES,
     CameraSupport,
     camera_support_for_server,
+    withheld_camera_support,
 )
 from roboscope_kit.policy import (
     DEFAULT_EVAL_MODE,
@@ -32,6 +33,22 @@ from roboscope_kit.policy import (
 from .adapters import ProcessSpec, ReplicaContext
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _withheld_camera_sizes_message(withheld: dict[str, frozenset[str]]) -> str:
+    cameras = ", ".join(sorted(withheld))
+    missing = sorted(set().union(*withheld.values()))
+    features = f"feature{'s' if len(missing) > 1 else ''} {', '.join(missing)}"
+    subject = f"camera {cameras} is" if len(withheld) == 1 else f"cameras {cameras} are"
+    return (
+        f"The roboscope-kit in the Policy environment lacks the image-size {features}, so "
+        f"{subject} offered only the benchmark's own size; upgrade roboscope-kit in the Policy "
+        "environment to negotiate these camera sizes"
+    )
+
+
+def _names_any_camera(message: str, withheld: dict[str, frozenset[str]]) -> bool:
+    return any(camera in message for camera in withheld)
 
 
 class PolicyProcessAdapter:
@@ -76,6 +93,7 @@ class PolicyProcessAdapter:
         self.gpu_vram_baselines: dict[str, int] = {}
         self.replica_vram_bytes: dict[int, int] = {}
         self._execution_contract: PolicyExecutionContract | None = None
+        self._withheld_camera_sizes_logged = False
         self._replica_lock = threading.Lock()
 
     def baseline_replicas(self, contexts: Sequence[ReplicaContext]) -> None:
@@ -125,6 +143,7 @@ class PolicyProcessAdapter:
             },
             eval_mode=self.eval_mode,
         )
+        withheld: dict[str, frozenset[str]] = {}
         with PolicyClient(context.socket_path, timeout_s=self.load_timeout_s) as client:
             camera_support = self.camera_support
             if camera_support is not None:
@@ -135,14 +154,38 @@ class PolicyProcessAdapter:
                     if isinstance(reported, list)
                     else BASELINE_IMAGE_SIZE_FEATURES
                 )
+                withheld = withheld_camera_support(session.benchmark, camera_support, server_features)
                 camera_support = camera_support_for_server(session.benchmark, camera_support, server_features)
-            capabilities = client.load(session, camera_support=camera_support)
-        contract = negotiate_policy_action_contract(
-            session.benchmark,
-            capabilities,
-            eval_mode=self.eval_mode,
-            camera_support=camera_support,
-        )
+                if withheld:
+                    with self._replica_lock:
+                        if not self._withheld_camera_sizes_logged:
+                            LOGGER.info(_withheld_camera_sizes_message(withheld))
+                            self._withheld_camera_sizes_logged = True
+            try:
+                capabilities = client.load(session, camera_support=camera_support)
+            except PolicyRemoteError as exc:
+                if not _names_any_camera(exc.remote_message, withheld):
+                    raise
+                raise PolicyRemoteError(
+                    {
+                        "operation": exc.operation,
+                        "type": exc.error_type,
+                        "message": f"{exc.remote_message}. {_withheld_camera_sizes_message(withheld)}",
+                        "traceback": exc.remote_traceback,
+                        "state": exc.state,
+                    }
+                ) from exc
+        try:
+            contract = negotiate_policy_action_contract(
+                session.benchmark,
+                capabilities,
+                eval_mode=self.eval_mode,
+                camera_support=camera_support,
+            )
+        except ValueError as exc:
+            if not _names_any_camera(str(exc), withheld):
+                raise
+            raise ValueError(f"{exc}. {_withheld_camera_sizes_message(withheld)}") from exc
         # Replicas on different GPUs initialize concurrently.
         with self._replica_lock:
             if self._execution_contract is not None and contract != self._execution_contract:
